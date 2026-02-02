@@ -1,229 +1,264 @@
-PS (Problem Statement)
+# 🚀 High-Frequency Exchange Simulator & Matching Engine
 
-Design and implement a high-performance exchange backend that accepts orders from multiple traders, maintains a fair and deterministic order book, matches orders using price-time priority, executes trades, updates accounts, and exposes real-time market data and analytics — while simulating latency and fairness constraints similar to real exchanges (NASDAQ / crypto).
+## 📋 Problem Statement
 
-In short:
+Design and implement a **high-performance exchange backend** that accepts orders from multiple traders, maintains a **fair and deterministic order book**, matches orders using **price-time priority**, executes trades, and streams real-time market data.
 
-Many users
+### In Short:
 
-Many orders
+- ✅ **Many users**
+- ✅ **Many orders**
+- ⚠️ **Same price ≠ same priority**
+- ⏱️ **Milliseconds matter**
+- 🚨 **One bug = broken market**
 
-Same price ≠ same priority
+---
 
-Milliseconds matter
+## 🔄 Step-by-Step Flow (No Fluff)
 
-One bug = broken market
+### 1️⃣ **Trader Sends an Order**
 
-4
-Step-by-step (no fluff):
+- **Buy/Sell**
+- **Price**
+- **Quantity**
+- **Type** (limit / market)
 
-Trader sends an order
+### 2️⃣ **Exchange Validates**
 
-Buy/Sell
+- ✔️ Enough balance?
+- ✔️ Order format correct?
+- ✔️ Margin rules?
 
-Price
+### 3️⃣ **Order Enters Matching Engine**
 
-Quantity
+- Stored in **in-memory order book**
+- Sorted by **price → time**
 
-Type (limit / market)
+### 4️⃣ **Engine Tries to Match**
 
-Exchange validates
+- **Best bid ↔ best ask**
+- **FIFO** at same price
+- **Partial fills** allowed
 
-Enough balance?
+### 5️⃣ **Trade Executes**
 
-Order format correct?
+- Trade record generated
+- Wallets updated
+- Fees applied (maker/taker)
 
-Margin rules?
+### 6️⃣ **Market Updates Broadcast**
 
-Order enters Matching Engine
+- **WebSocket** price feed
+- Order book depth update
+- Trades stream
 
-Stored in in-memory order book
+### 7️⃣ **Analytics Engine Consumes Ticks**
 
-Sorted by price → time
+- Spread
+- Liquidity
+- Slippage
+- Latency metrics
 
-Engine tries to match
+**That's the loop. Thousands of times per second.**
 
-Best bid ↔ best ask
+---
 
-FIFO at same price
+## 🧩 Core Components — Explained Properly
 
-Partial fills allowed
+### 1️⃣ **Matching Engine (THE HEART)**
 
-Trade executes
+#### What It Does
 
-Trade record generated
+**Maintains two books:**
 
-Wallets updated
+- **Bid book** (buyers)
+- **Ask book** (sellers)
 
-Fees applied (maker/taker)
+**Always matches:**
 
-Market updates broadcast
+- **Highest bid** with **lowest ask**
 
-WebSocket price feed
+**Enforces:**
 
-Order book depth update
+- **Price priority**
+- **Time priority (FIFO)**
 
-Trades stream
+#### Example
 
-Analytics engine consumes ticks
-
-Spread
-
-Liquidity
-
-Slippage
-
-Latency metrics
-
-That’s the loop. Thousands of times per second.
-
-🧩 Core Components — explained properly
-1️⃣ Matching Engine (THE HEART)
-
-What it does
-
-Maintains two books:
-
-Bid book (buyers)
-
-Ask book (sellers)
-
-Always matches:
-
-Highest bid with lowest ask
-
-Enforces:
-
-Price priority
-
-Time priority (FIFO)
-
-Example
-
+```
 BUY  100 @ 101 (10:00:01)
 BUY  100 @ 101 (10:00:02)
 SELL 150 @ 101
+```
 
+**Execution:**
 
-Execution:
+- First buyer gets **100**
+- Second buyer gets **50**
+- Second buyer still has **50 open**
 
-First buyer gets 100
+> ⚠️ **If you mess this up → market is unfair.**
 
-Second buyer gets 50
+---
 
-Second buyer still has 50 open
+### 2️⃣ **Order Book (In-Memory)**
 
-If you mess this up → market is unfair.
+#### Data Structures (Important):
 
-2️⃣ Order Book (In-Memory)
+- **Price levels** → sorted maps
+- **Orders per level** → queues (FIFO)
 
-Data structures (important):
+**Typical structure:**
 
-Price levels → sorted maps
-
-Orders per level → queues (FIFO)
-
-Typical structure:
-
+```
 Map<Price, Queue<Order>>
+```
 
+#### Why In-Memory?
 
-Why in-memory?
+- ❌ **Databases are too slow**
+- ✅ **Matching must be deterministic and fast**
+- 💾 **Persistence happens after, asynchronously**
 
-Databases are too slow
+---
 
-Matching must be deterministic and fast
+### 3️⃣ **Exchange APIs**
 
-Persistence happens after, asynchronously.
+These are thin. **The engine does the real work.**
 
-3️⃣ Exchange APIs
+#### Endpoints:
 
-These are thin. The engine does the real work.
+- `POST /order`
+- `DELETE /order/{id}`
+- `GET /order/{id}`
+- `GET /trades`
+- `GET /orderbook`
 
-Endpoints:
+#### Real-time:
 
-POST /order
+**WebSockets for:**
 
-DELETE /order/{id}
+- Trades
+- Top of book
+- Depth updates
 
-GET /order/{id}
+---
 
-GET /trades
+### 4️⃣ **Trader Accounts & Wallets**
 
-GET /orderbook
+#### Each Trader Has:
 
-Real-time:
+- **Available balance**
+- **Locked balance** (open orders)
+- **P&L** (realized + unrealized)
 
-WebSockets for:
+#### Margin Simulation:
 
-Trades
+- **Leverage**
+- **Liquidation checks**
+- **Maintenance margin**
 
-Top of book
+> 💡 **This alone can be a separate project.**
 
-Depth updates
+---
 
-4️⃣ Trader Accounts & Wallets
+### 5️⃣ **Market Microstructure Analytics**
 
-Each trader has:
+> 🎯 **This is what makes interviewers pause.**
 
-Available balance
+#### You Compute:
 
-Locked balance (open orders)
+- **Bid-ask spread** over time
+- **Order book depth** at each level
+- **Liquidity heatmaps**
+- **Slippage** vs order size
+- **Impact cost**
 
-P&L (realized + unrealized)
+#### Uses:
 
-Margin simulation:
+- **Tick data** (every trade)
+- **Snapshot data** (order book states)
 
-Leverage
+#### Stored In:
 
-Liquidation checks
+- **ClickHouse** / **TimescaleDB**
 
-Maintenance margin
+---
 
-This alone can be a separate project.
+### 6️⃣ **Latency & Fairness Simulation**
 
-5️⃣ Market Microstructure Analytics
+> 🔥 **Very advanced, very rare.**
 
-This is what makes interviewers pause.
+#### You Track:
 
-You compute:
+- When order was **received**
+- When it **entered queue**
+- When it **executed**
 
-Bid-ask spread over time
+#### Then Simulate:
 
-Order book depth at each level
+- **Network delay**
+- **Queue position advantage**
+- **Maker vs taker fees**
 
-Liquidity heatmaps
+---
 
-Slippage vs order size
+## 🏗️ Tech Stack Suggestions
 
-Impact cost
+| Component | Technology |
+|-----------|------------|
+| **Backend** | Rust / C++ / Go |
+| **Order Book** | In-Memory (Custom DS) |
+| **Database** | PostgreSQL / TimescaleDB |
+| **Real-time** | WebSocket / gRPC |
+| **Analytics** | Python / Pandas / NumPy |
+| **Storage** | ClickHouse / Redis |
 
-Uses:
+---
 
-Tick data (every trade)
+## 📊 Performance Goals
 
-Snapshot data (order book states)
+| Metric | Target |
+|--------|--------|
+| **Order Processing** | < 1ms |
+| **Match Latency** | < 500μs |
+| **WebSocket Updates** | < 10ms |
+| **Orders/Second** | 100,000+ |
 
-Stored in:
+---
 
-ClickHouse / TimescaleDB
+## 🎯 Why This Project Matters
 
-6️⃣ Latency & Fairness Simulation
+✅ **For Quant Roles**: Shows understanding of market microstructure  
+✅ **For Backend Roles**: Demonstrates low-latency system design  
+✅ **For Interviews**: Differentiates you from 99% of candidates  
 
-Very advanced, very rare.
+---
 
-You track:
+## 🚀 Getting Started
 
-When order was received
+```bash
+# Clone the repository
+git clone https://github.com/000Shreeharish000/Quant-Project-High-Frequency-Exchange-Simulator-Matching-Engine-.git
 
-When it entered queue
+# Navigate to project
+cd Quant-Project-High-Frequency-Exchange-Simulator-Matching-Engine-
 
-When it executed
+# Follow setup instructions (coming soon)
+```
 
-Then simulate:
+---
 
-Network delay
+## 📝 License
 
-Queue position advantage
+MIT License - Feel free to use this for learning and interviews.
 
-Maker vs taker fees
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
+
+---
+
+**Built with ❤️ for quantitative finance enthusiasts**

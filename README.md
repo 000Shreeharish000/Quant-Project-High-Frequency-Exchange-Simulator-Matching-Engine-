@@ -1,73 +1,229 @@
-# Welcome to your Lovable project
+PS (Problem Statement)
 
-## Project info
+Design and implement a high-performance exchange backend that accepts orders from multiple traders, maintains a fair and deterministic order book, matches orders using price-time priority, executes trades, updates accounts, and exposes real-time market data and analytics — while simulating latency and fairness constraints similar to real exchanges (NASDAQ / crypto).
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+In short:
 
-## How can I edit this code?
+Many users
 
-There are several ways of editing your application.
+Many orders
 
-**Use Lovable**
+Same price ≠ same priority
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Milliseconds matter
 
-Changes made via Lovable will be committed automatically to this repo.
+One bug = broken market
 
-**Use your preferred IDE**
+4
+Step-by-step (no fluff):
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Trader sends an order
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Buy/Sell
 
-Follow these steps:
+Price
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Quantity
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Type (limit / market)
 
-# Step 3: Install the necessary dependencies.
-npm i
+Exchange validates
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+Enough balance?
 
-**Edit a file directly in GitHub**
+Order format correct?
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Margin rules?
 
-**Use GitHub Codespaces**
+Order enters Matching Engine
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Stored in in-memory order book
 
-## What technologies are used for this project?
+Sorted by price → time
 
-This project is built with:
+Engine tries to match
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Best bid ↔ best ask
 
-## How can I deploy this project?
+FIFO at same price
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Partial fills allowed
 
-## Can I connect a custom domain to my Lovable project?
+Trade executes
 
-Yes, you can!
+Trade record generated
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Wallets updated
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Fees applied (maker/taker)
+
+Market updates broadcast
+
+WebSocket price feed
+
+Order book depth update
+
+Trades stream
+
+Analytics engine consumes ticks
+
+Spread
+
+Liquidity
+
+Slippage
+
+Latency metrics
+
+That’s the loop. Thousands of times per second.
+
+🧩 Core Components — explained properly
+1️⃣ Matching Engine (THE HEART)
+
+What it does
+
+Maintains two books:
+
+Bid book (buyers)
+
+Ask book (sellers)
+
+Always matches:
+
+Highest bid with lowest ask
+
+Enforces:
+
+Price priority
+
+Time priority (FIFO)
+
+Example
+
+BUY  100 @ 101 (10:00:01)
+BUY  100 @ 101 (10:00:02)
+SELL 150 @ 101
+
+
+Execution:
+
+First buyer gets 100
+
+Second buyer gets 50
+
+Second buyer still has 50 open
+
+If you mess this up → market is unfair.
+
+2️⃣ Order Book (In-Memory)
+
+Data structures (important):
+
+Price levels → sorted maps
+
+Orders per level → queues (FIFO)
+
+Typical structure:
+
+Map<Price, Queue<Order>>
+
+
+Why in-memory?
+
+Databases are too slow
+
+Matching must be deterministic and fast
+
+Persistence happens after, asynchronously.
+
+3️⃣ Exchange APIs
+
+These are thin. The engine does the real work.
+
+Endpoints:
+
+POST /order
+
+DELETE /order/{id}
+
+GET /order/{id}
+
+GET /trades
+
+GET /orderbook
+
+Real-time:
+
+WebSockets for:
+
+Trades
+
+Top of book
+
+Depth updates
+
+4️⃣ Trader Accounts & Wallets
+
+Each trader has:
+
+Available balance
+
+Locked balance (open orders)
+
+P&L (realized + unrealized)
+
+Margin simulation:
+
+Leverage
+
+Liquidation checks
+
+Maintenance margin
+
+This alone can be a separate project.
+
+5️⃣ Market Microstructure Analytics
+
+This is what makes interviewers pause.
+
+You compute:
+
+Bid-ask spread over time
+
+Order book depth at each level
+
+Liquidity heatmaps
+
+Slippage vs order size
+
+Impact cost
+
+Uses:
+
+Tick data (every trade)
+
+Snapshot data (order book states)
+
+Stored in:
+
+ClickHouse / TimescaleDB
+
+6️⃣ Latency & Fairness Simulation
+
+Very advanced, very rare.
+
+You track:
+
+When order was received
+
+When it entered queue
+
+When it executed
+
+Then simulate:
+
+Network delay
+
+Queue position advantage
+
+Maker vs taker fees

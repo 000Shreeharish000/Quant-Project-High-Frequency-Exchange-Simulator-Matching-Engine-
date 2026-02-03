@@ -1,73 +1,264 @@
-# Welcome to your Lovable project
+# 🚀 High-Frequency Exchange Simulator & Matching Engine
 
-## Project info
+## 📋 Problem Statement
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Design and implement a **high-performance exchange backend** that accepts orders from multiple traders, maintains a **fair and deterministic order book**, matches orders using **price-time priority**, executes trades, and streams real-time market data.
 
-## How can I edit this code?
+### In Short:
 
-There are several ways of editing your application.
+- ✅ **Many users**
+- ✅ **Many orders**
+- ⚠️ **Same price ≠ same priority**
+- ⏱️ **Milliseconds matter**
+- 🚨 **One bug = broken market**
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 🔄 Step-by-Step Flow (No Fluff)
 
-Changes made via Lovable will be committed automatically to this repo.
+### 1️⃣ **Trader Sends an Order**
 
-**Use your preferred IDE**
+- **Buy/Sell**
+- **Price**
+- **Quantity**
+- **Type** (limit / market)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 2️⃣ **Exchange Validates**
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- ✔️ Enough balance?
+- ✔️ Order format correct?
+- ✔️ Margin rules?
 
-Follow these steps:
+### 3️⃣ **Order Enters Matching Engine**
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- Stored in **in-memory order book**
+- Sorted by **price → time**
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 4️⃣ **Engine Tries to Match**
 
-# Step 3: Install the necessary dependencies.
-npm i
+- **Best bid ↔ best ask**
+- **FIFO** at same price
+- **Partial fills** allowed
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### 5️⃣ **Trade Executes**
+
+- Trade record generated
+- Wallets updated
+- Fees applied (maker/taker)
+
+### 6️⃣ **Market Updates Broadcast**
+
+- **WebSocket** price feed
+- Order book depth update
+- Trades stream
+
+### 7️⃣ **Analytics Engine Consumes Ticks**
+
+- Spread
+- Liquidity
+- Slippage
+- Latency metrics
+
+**That's the loop. Thousands of times per second.**
+
+---
+
+## 🧩 Core Components — Explained Properly
+
+### 1️⃣ **Matching Engine (THE HEART)**
+
+#### What It Does
+
+**Maintains two books:**
+
+- **Bid book** (buyers)
+- **Ask book** (sellers)
+
+**Always matches:**
+
+- **Highest bid** with **lowest ask**
+
+**Enforces:**
+
+- **Price priority**
+- **Time priority (FIFO)**
+
+#### Example
+
+```
+BUY  100 @ 101 (10:00:01)
+BUY  100 @ 101 (10:00:02)
+SELL 150 @ 101
 ```
 
-**Edit a file directly in GitHub**
+**Execution:**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- First buyer gets **100**
+- Second buyer gets **50**
+- Second buyer still has **50 open**
 
-**Use GitHub Codespaces**
+> ⚠️ **If you mess this up → market is unfair.**
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+---
 
-## What technologies are used for this project?
+### 2️⃣ **Order Book (In-Memory)**
 
-This project is built with:
+#### Data Structures (Important):
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Price levels** → sorted maps
+- **Orders per level** → queues (FIFO)
 
-## How can I deploy this project?
+**Typical structure:**
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```
+Map<Price, Queue<Order>>
+```
 
-## Can I connect a custom domain to my Lovable project?
+#### Why In-Memory?
 
-Yes, you can!
+- ❌ **Databases are too slow**
+- ✅ **Matching must be deterministic and fast**
+- 💾 **Persistence happens after, asynchronously**
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### 3️⃣ **Exchange APIs**
+
+These are thin. **The engine does the real work.**
+
+#### Endpoints:
+
+- `POST /order`
+- `DELETE /order/{id}`
+- `GET /order/{id}`
+- `GET /trades`
+- `GET /orderbook`
+
+#### Real-time:
+
+**WebSockets for:**
+
+- Trades
+- Top of book
+- Depth updates
+
+---
+
+### 4️⃣ **Trader Accounts & Wallets**
+
+#### Each Trader Has:
+
+- **Available balance**
+- **Locked balance** (open orders)
+- **P&L** (realized + unrealized)
+
+#### Margin Simulation:
+
+- **Leverage**
+- **Liquidation checks**
+- **Maintenance margin**
+
+> 💡 **This alone can be a separate project.**
+
+---
+
+### 5️⃣ **Market Microstructure Analytics**
+
+> 🎯 **This is what makes interviewers pause.**
+
+#### You Compute:
+
+- **Bid-ask spread** over time
+- **Order book depth** at each level
+- **Liquidity heatmaps**
+- **Slippage** vs order size
+- **Impact cost**
+
+#### Uses:
+
+- **Tick data** (every trade)
+- **Snapshot data** (order book states)
+
+#### Stored In:
+
+- **ClickHouse** / **TimescaleDB**
+
+---
+
+### 6️⃣ **Latency & Fairness Simulation**
+
+> 🔥 **Very advanced, very rare.**
+
+#### You Track:
+
+- When order was **received**
+- When it **entered queue**
+- When it **executed**
+
+#### Then Simulate:
+
+- **Network delay**
+- **Queue position advantage**
+- **Maker vs taker fees**
+
+---
+
+## 🏗️ Tech Stack Suggestions
+
+| Component | Technology |
+|-----------|------------|
+| **Backend** | Rust / C++ / Go |
+| **Order Book** | In-Memory (Custom DS) |
+| **Database** | PostgreSQL / TimescaleDB |
+| **Real-time** | WebSocket / gRPC |
+| **Analytics** | Python / Pandas / NumPy |
+| **Storage** | ClickHouse / Redis |
+
+---
+
+## 📊 Performance Goals
+
+| Metric | Target |
+|--------|--------|
+| **Order Processing** | < 1ms |
+| **Match Latency** | < 500μs |
+| **WebSocket Updates** | < 10ms |
+| **Orders/Second** | 100,000+ |
+
+---
+
+## 🎯 Why This Project Matters
+
+✅ **For Quant Roles**: Shows understanding of market microstructure  
+✅ **For Backend Roles**: Demonstrates low-latency system design  
+✅ **For Interviews**: Differentiates you from 99% of candidates  
+
+---
+
+## 🚀 Getting Started
+
+```bash
+# Clone the repository
+git clone https://github.com/000Shreeharish000/Quant-Project-High-Frequency-Exchange-Simulator-Matching-Engine-.git
+
+# Navigate to project
+cd Quant-Project-High-Frequency-Exchange-Simulator-Matching-Engine-
+
+# Follow setup instructions (coming soon)
+```
+
+---
+
+## 📝 License
+
+MIT License - Feel free to use this for learning and interviews.
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
+
+---
+
+**Built with ❤️ for quantitative finance enthusiasts**

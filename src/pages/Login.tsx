@@ -1,18 +1,44 @@
-import { useState, FormEvent } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, FormEvent, useEffect } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import GoogleIcon from "@/components/GoogleIcon";
 
 interface FormErrors {
   email?: string;
   password?: string;
+  general?: string;
 }
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+  // Handle Google OAuth callback
+  useEffect(() => {
+    const token = searchParams.get("token");
+    const user = searchParams.get("user");
+
+    if (token) {
+      localStorage.setItem("accessToken", token);
+      if (user) {
+        localStorage.setItem("user", user);
+      }
+      navigate("/trade");
+    }
+
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      setErrors((prev) => ({
+        ...prev,
+        general: "Google authentication failed. Please try again.",
+      }));
+    }
+  }, [searchParams, navigate]);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -39,22 +65,43 @@ const Login = () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    setIsLoading(false);
-    navigate("/trade");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.toLowerCase(),
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+
+      // Store token and user info
+      localStorage.setItem("accessToken", data.data.accessToken);
+      localStorage.setItem("user", JSON.stringify(data.data.user));
+
+      navigate("/trade");
+    } catch (error: any) {
+      setErrors((prev) => ({
+        ...prev,
+        general: error.message || "Login failed. Please try again.",
+      }));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true);
-    
-    // Simulate Google OAuth
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    
-    setIsLoading(false);
-    navigate("/trade");
+  const handleGoogleSignIn = () => {
+    // Redirect to Google OAuth endpoint on backend
+    window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
   return (
@@ -70,7 +117,12 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Google Sign In */}
+        {/* General Error Message */}
+        {errors.general && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
+            {errors.general}
+          </div>
+        )}
         <button
           type="button"
           onClick={handleGoogleSignIn}

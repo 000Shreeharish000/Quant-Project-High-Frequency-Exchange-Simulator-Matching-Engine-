@@ -1,264 +1,98 @@
-# 🚀 High-Frequency Exchange Simulator & Matching Engine
-
-## 📋 Problem Statement
-
-Design and implement a **high-performance exchange backend** that accepts orders from multiple traders, maintains a **fair and deterministic order book**, matches orders using **price-time priority**, executes trades, and streams real-time market data.
-
-### In Short:
-
-- ✅ **Many users**
-- ✅ **Many orders**
-- ⚠️ **Same price ≠ same priority**
-- ⏱️ **Milliseconds matter**
-- 🚨 **One bug = broken market**
-
----
-
-## 🔄 Step-by-Step Flow (No Fluff)
-
-### 1️⃣ **Trader Sends an Order**
-
-- **Buy/Sell**
-- **Price**
-- **Quantity**
-- **Type** (limit / market)
-
-### 2️⃣ **Exchange Validates**
-
-- ✔️ Enough balance?
-- ✔️ Order format correct?
-- ✔️ Margin rules?
-
-### 3️⃣ **Order Enters Matching Engine**
-
-- Stored in **in-memory order book**
-- Sorted by **price → time**
-
-### 4️⃣ **Engine Tries to Match**
-
-- **Best bid ↔ best ask**
-- **FIFO** at same price
-- **Partial fills** allowed
-
-### 5️⃣ **Trade Executes**
-
-- Trade record generated
-- Wallets updated
-- Fees applied (maker/taker)
-
-### 6️⃣ **Market Updates Broadcast**
-
-- **WebSocket** price feed
-- Order book depth update
-- Trades stream
-
-### 7️⃣ **Analytics Engine Consumes Ticks**
-
-- Spread
-- Liquidity
-- Slippage
-- Latency metrics
-
-**That's the loop. Thousands of times per second.**
-
----
-
-## 🧩 Core Components — Explained Properly
-
-### 1️⃣ **Matching Engine (THE HEART)**
-
-#### What It Does
-
-**Maintains two books:**
-
-- **Bid book** (buyers)
-- **Ask book** (sellers)
-
-**Always matches:**
-
-- **Highest bid** with **lowest ask**
-
-**Enforces:**
-
-- **Price priority**
-- **Time priority (FIFO)**
-
-#### Example
-
-```
-BUY  100 @ 101 (10:00:01)
-BUY  100 @ 101 (10:00:02)
-SELL 150 @ 101
-```
-
-**Execution:**
-
-- First buyer gets **100**
-- Second buyer gets **50**
-- Second buyer still has **50 open**
-
-> ⚠️ **If you mess this up → market is unfair.**
-
----
-
-### 2️⃣ **Order Book (In-Memory)**
-
-#### Data Structures (Important):
-
-- **Price levels** → sorted maps
-- **Orders per level** → queues (FIFO)
-
-**Typical structure:**
-
-```
-Map<Price, Queue<Order>>
-```
-
-#### Why In-Memory?
-
-- ❌ **Databases are too slow**
-- ✅ **Matching must be deterministic and fast**
-- 💾 **Persistence happens after, asynchronously**
-
----
-
-### 3️⃣ **Exchange APIs**
-
-These are thin. **The engine does the real work.**
-
-#### Endpoints:
-
-- `POST /order`
-- `DELETE /order/{id}`
-- `GET /order/{id}`
-- `GET /trades`
-- `GET /orderbook`
-
-#### Real-time:
-
-**WebSockets for:**
-
-- Trades
-- Top of book
-- Depth updates
-
----
-
-### 4️⃣ **Trader Accounts & Wallets**
-
-#### Each Trader Has:
-
-- **Available balance**
-- **Locked balance** (open orders)
-- **P&L** (realized + unrealized)
-
-#### Margin Simulation:
-
-- **Leverage**
-- **Liquidation checks**
-- **Maintenance margin**
-
-> 💡 **This alone can be a separate project.**
-
----
-
-### 5️⃣ **Market Microstructure Analytics**
-
-> 🎯 **This is what makes interviewers pause.**
-
-#### You Compute:
-
-- **Bid-ask spread** over time
-- **Order book depth** at each level
-- **Liquidity heatmaps**
-- **Slippage** vs order size
-- **Impact cost**
-
-#### Uses:
-
-- **Tick data** (every trade)
-- **Snapshot data** (order book states)
-
-#### Stored In:
-
-- **ClickHouse** / **TimescaleDB**
-
----
-
-### 6️⃣ **Latency & Fairness Simulation**
-
-> 🔥 **Very advanced, very rare.**
-
-#### You Track:
-
-- When order was **received**
-- When it **entered queue**
-- When it **executed**
-
-#### Then Simulate:
-
-- **Network delay**
-- **Queue position advantage**
-- **Maker vs taker fees**
-
----
-
-## 🏗️ Tech Stack Suggestions
-
-| Component | Technology |
-|-----------|------------|
-| **Backend** | Rust / C++ / Go |
-| **Order Book** | In-Memory (Custom DS) |
-| **Database** | PostgreSQL / TimescaleDB |
-| **Real-time** | WebSocket / gRPC |
-| **Analytics** | Python / Pandas / NumPy |
-| **Storage** | ClickHouse / Redis |
-
----
-
-## 📊 Performance Goals
-
-| Metric | Target |
-|--------|--------|
-| **Order Processing** | < 1ms |
-| **Match Latency** | < 500μs |
-| **WebSocket Updates** | < 10ms |
-| **Orders/Second** | 100,000+ |
-
----
-
-## 🎯 Why This Project Matters
-
-✅ **For Quant Roles**: Shows understanding of market microstructure  
-✅ **For Backend Roles**: Demonstrates low-latency system design  
-✅ **For Interviews**: Differentiates you from 99% of candidates  
-
----
-
-## 🚀 Getting Started
+# NEXUSX - Financial Exchange Platform
+
+## ✅ Authentication System Complete
+
+### What's Working
+- ✅ Email/password registration & login
+- ✅ Google OAuth 2.0 sign-in
+- ✅ JWT tokens + Redis sessions
+- ✅ PostgreSQL database
+- ✅ Rate limiting
+- ✅ React frontend integration
+
+## Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/000Shreeharish000/Quant-Project-High-Frequency-Exchange-Simulator-Matching-Engine-.git
+# 1. Start database & cache
+docker-compose up -d
 
-# Navigate to project
-cd Quant-Project-High-Frequency-Exchange-Simulator-Matching-Engine-
+# 2. Start backend
+cd backend
+npm install
+cp .env.example .env
+npm run db:init
+npm run dev
 
-# Follow setup instructions (coming soon)
+# 3. Start frontend (new terminal)
+npm run dev
+
+# 4. Visit http://localhost:5173
 ```
 
----
+## API Endpoints
 
-## 📝 License
+```
+POST   /auth/register   - Create account
+POST   /auth/login      - Login
+GET    /auth/google     - Google OAuth
+POST   /auth/logout     - Logout
+GET    /auth/me         - Get profile
+```
 
-MIT License - Feel free to use this for learning and interviews.
+## Using Auth in React
 
----
+```tsx
+import AuthService from '@/utils/AuthService';
+import ApiClient from '@/utils/ApiClient';
 
-## 🤝 Contributing
+// Check logged in
+if (!AuthService.isAuthenticated()) {
+  navigate('/login');
+}
 
-Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
-If you would love to contrribute please do so
----
+// Make authenticated API call
+const result = await ApiClient.get('/api/endpoint');
 
-**Built with No love  for quantitative finance enthusiasts**
+// Logout
+await AuthService.logoutServer();
+```
+
+## Environment Variables
+
+**Backend (.env)**
+```env
+PORT=5000
+DB_HOST=localhost
+DB_USER=postgres
+DB_PASSWORD=postgres
+JWT_SECRET=your-secret-key
+FRONTEND_URL=http://localhost:5173
+```
+
+**Frontend (.env.local)**
+```env
+REACT_APP_API_URL=http://localhost:5000
+```
+
+## Files Created
+
+**Backend:**
+- `backend/src/` - Express API with auth logic
+- `backend/src/models/User.ts` - Database model
+- `backend/src/services/AuthService.ts` - Auth logic
+- `backend/src/routes/auth.ts` - API endpoints
+- `backend/src/middleware/` - JWT & rate limiting
+
+**Frontend:**
+- `src/pages/Login.tsx` - Login page
+- `src/pages/Signup.tsx` - Signup page
+- `src/utils/AuthService.ts` - Token management
+- `src/utils/ApiClient.ts` - Authenticated API calls
+
+**Infrastructure:**
+- `docker-compose.yml` - PostgreSQL + Redis
+- `backend/Dockerfile` - Container image
+
+## Setup Instructions
+
+See [SETUP.md](SETUP.md) for detailed steps and troubleshooting.

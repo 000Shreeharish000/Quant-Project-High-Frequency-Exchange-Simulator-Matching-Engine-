@@ -3,30 +3,28 @@
 ## ✅ Authentication System Complete
 
 ### What's Working
--  Email/password registration & login
--  Google OAuth 2.0 sign-in
--  JWT tokens + Redis sessions
--  PostgreSQL database
--  Rate limiting
--  React frontend integration
+- ✅ Email/password registration & login
+- ✅ Google OAuth 2.0 sign-in
+- ✅ JWT tokens + Redis sessions
+- ✅ PostgreSQL database
+- ✅ Rate limiting
+- ✅ React frontend integration
 
 ## Quick Start
 
 ```bash
-# 1. Start database & cache
+# 1) Optional infra for auth module
 docker-compose up -d
 
-# 2. Start backend
+# 2) Backend
 cd backend
 npm install
-cp .env.example .env
-npm run db:init
+npm run build
 npm run dev
 
-# 3. Start frontend (new terminal)
+# 3) Frontend (new terminal from repo root)
+npm install
 npm run dev
-
-# 4. Visit http://localhost:5173
 ```
 
 ## API Endpoints
@@ -90,9 +88,8 @@ REACT_APP_API_URL=http://localhost:5000
 - `src/utils/ApiClient.ts` - Authenticated API calls
 
 **Infrastructure:**
-- `docker-compose.yml` - PostgreSQL + Redis [Two distinct Databases for different for use cases]
+- `docker-compose.yml` - PostgreSQL + Redis
 - `backend/Dockerfile` - Container image
-- `Pull request` - Recently made a pull request using codex agent , for checking the agents ability to create a PR and the quality of PR
 
 ## Setup Instructions
 

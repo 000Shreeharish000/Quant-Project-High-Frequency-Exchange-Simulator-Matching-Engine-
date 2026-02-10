@@ -1,14 +1,14 @@
-# NEXUSX - Financial Exchange Platform
+# NEXUSX - Financial Exchange Platform with high end Backend system
 
-## ✅ Authentication System Complete
+## Authentication System Complete
 
 ### What's Working
-- ✅ Email/password registration & login
-- ✅ Google OAuth 2.0 sign-in
-- ✅ JWT tokens + Redis sessions
-- ✅ PostgreSQL database
-- ✅ Rate limiting
-- ✅ React frontend integration
+- Email/password registration & login
+- Google OAuth 2.0 sign-in
+- JWT tokens + Redis sessions
+- PostgreSQL database
+- Rate limiting
+- React frontend integration
 
 ## Quick Start
 

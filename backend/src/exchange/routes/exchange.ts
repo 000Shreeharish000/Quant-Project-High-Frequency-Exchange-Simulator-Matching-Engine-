@@ -1,0 +1,125 @@
+import { Router } from "express";
+import { z } from "zod";
+import { matchingEngine } from "../services/MatchingEngine.js";
+
+const router = Router();
+
+const accountSchema = z.object({
+  traderId: z.string().min(2),
+  cashDelta: z.number().finite(),
+});
+
+const orderSchema = z.object({
+  traderId: z.string().min(2),
+  symbol: z.string().min(2).max(15),
+  side: z.enum(["buy", "sell"]),
+  price: z.number().positive(),
+  quantity: z.number().positive(),
+  timeInForce: z.enum(["gtc", "ioc"]).optional(),
+  clientOrderId: z.string().max(64).optional(),
+});
+
+const cancelSchema = z.object({
+  traderId: z.string().min(2),
+});
+
+router.post("/accounts/fund", (req, res) => {
+  const parsed = accountSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid account funding payload",
+      details: parsed.error.flatten(),
+    });
+  }
+
+  const account = matchingEngine.createOrUpdateAccount(parsed.data.traderId, parsed.data.cashDelta);
+  return res.status(200).json({ success: true, data: account });
+});
+
+router.get("/accounts/:traderId", (req, res) => {
+  const account = matchingEngine.getAccount(req.params.traderId);
+  if (!account) {
+    return res.status(404).json({ success: false, error: "Account not found" });
+  }
+  return res.status(200).json({ success: true, data: account });
+});
+
+router.post("/orders", async (req, res) => {
+  const parsed = orderSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid order payload",
+      details: parsed.error.flatten(),
+    });
+  }
+
+  const result = await matchingEngine.enqueueOrder(parsed.data);
+
+  if (!result.accepted) {
+    return res.status(422).json({ success: false, error: result.reason });
+  }
+
+  return res.status(201).json({
+    success: true,
+    data: {
+      order: result.order,
+      trades: result.trades,
+    },
+  });
+});
+
+router.delete("/orders/:orderId", (req, res) => {
+  const parsed = cancelSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid cancel payload",
+      details: parsed.error.flatten(),
+    });
+  }
+
+  const result = matchingEngine.cancelOrder(req.params.orderId, parsed.data.traderId);
+  if (!result.cancelled) {
+    return res.status(409).json({ success: false, error: result.reason });
+  }
+
+  return res.status(200).json({ success: true, data: result.order });
+});
+
+router.get("/orderbook/:symbol", (req, res) => {
+  const depth = Number.parseInt(String(req.query.depth ?? "20"), 10);
+  const snapshot = matchingEngine.getOrderBook(req.params.symbol, Number.isNaN(depth) ? 20 : depth);
+  return res.status(200).json({ success: true, data: snapshot });
+});
+
+router.get("/trades/:symbol", (req, res) => {
+  const limit = Number.parseInt(String(req.query.limit ?? "100"), 10);
+  const trades = matchingEngine.getTrades(req.params.symbol, Number.isNaN(limit) ? 100 : limit);
+  return res.status(200).json({ success: true, data: trades });
+});
+
+router.get("/analytics/:symbol", (req, res) => {
+  const analytics = matchingEngine.getAnalytics(req.params.symbol);
+  return res.status(200).json({ success: true, data: analytics });
+});
+
+router.get("/events", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const unsubscribe = matchingEngine.onEvent((event) => {
+    res.write(`event: ${event.type}\n`);
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  });
+
+  req.on("close", () => {
+    unsubscribe();
+    res.end();
+  });
+});
+
+export default router;

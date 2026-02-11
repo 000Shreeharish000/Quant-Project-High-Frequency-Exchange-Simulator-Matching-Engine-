@@ -34,7 +34,7 @@
     --input: 220 12% 14%;
     --ring: 200 70% 50%;
 
-    --radius: 0.375rem;
+    --radius: 0rem;
 
     /* Custom exchange colors */
     --surface-elevated: 220 15% 10%;
@@ -71,6 +71,13 @@
 @layer base {
   * {
     @apply border-border;
+  }
+
+
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
   }
 
   body {

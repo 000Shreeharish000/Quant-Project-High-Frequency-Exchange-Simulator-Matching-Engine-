@@ -37,26 +37,6 @@ services:
     networks:
       - nexusx-network
 
-  # Node.js Backend (optional - uncomment to run in container)
-  # backend:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   container_name: nexusx-backend
-  #   environment:
-  #     DB_HOST: postgres
-  #     REDIS_HOST: redis
-  #     NODE_ENV: development
-  #   ports:
-  #     - "5000:5000"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   networks:
-  #     - nexusx-network
-
 volumes:
   postgres_data:
   redis_data:

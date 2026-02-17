@@ -66,15 +66,6 @@ Should see `http://localhost:5173` is ready.
 4. Click "Create Account"
 5. Should redirect to `/trade` ✅
 
-## Google OAuth Setup (Optional)
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create new project
-3. Enable "Google+ API"
-4. OAuth consent screen → Create
-5. Credentials → OAuth 2.0 Client ID → Web application
-6. Authorized redirect URIs → Add:
-   ```
    http://localhost:5000/auth/google/callback
    ```
 7. Copy Client ID and Secret
@@ -206,10 +197,6 @@ Ctrl+C in frontend terminal
    - Use AWS ElastiCache, Railway, or similar
    - Update Redis credentials in `.env`
 
-4. **Google OAuth**
-   - Add production domain to allowed redirects
-   - Update `GOOGLE_CALLBACK_URL` to production
-
 5. **Frontend Domain**
    ```env
    FRONTEND_URL=https://yourdomain.com
@@ -248,8 +235,5 @@ Ctrl+C in frontend terminal
 - [ ] Can access protected routes
 - [ ] Can logout
 
-All checked? You're good to go! ✅
-
 ---
-
 See README.md for overview and usage examples.

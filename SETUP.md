@@ -202,17 +202,6 @@ Ctrl+C in frontend terminal
    FRONTEND_URL=https://yourdomain.com
    ```
 
-6. **Build & Deploy**
-   ```bash
-   cd backend
-   npm run build
-   # Deploy dist/ folder
-   
-   # Frontend
-   npm run build
-   # Deploy to Vercel, Netlify, etc.
-   ```
-d
 
 ## Verification Checklist
 

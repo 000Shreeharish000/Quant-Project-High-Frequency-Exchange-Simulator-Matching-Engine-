@@ -197,9 +197,6 @@ Ctrl+C in frontend terminal
    - Use AWS ElastiCache, Railway, or similar
    - Update Redis credentials in `.env`
 
-5. **Frontend Domain**
-   ```env
-   FRONTEND_URL=https://yourdomain.com
    ```
 
 

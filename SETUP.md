@@ -212,13 +212,7 @@ Ctrl+C in frontend terminal
    npm run build
    # Deploy to Vercel, Netlify, etc.
    ```
-
-### Recommended Platforms
-
-- **Backend**: Railway, Vercel, Heroku, AWS
-- **Database**: Railway, AWS RDS, Heroku Postgres
-- **Redis**: Railway, AWS ElastiCache
-- **Frontend**: Vercel, Netlify
+d
 
 ## Verification Checklist
 

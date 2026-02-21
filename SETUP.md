@@ -1,11 +1,4 @@
-# Setup Instructions
 
-## Prerequisites
-
-- Docker & Docker Compose
-- Node.js 18+
-- PostgreSQL 12+ (or use Docker)
-- Redis 6+ (or use Docker)
 
 ## Step 1: Start Database & Cache
 
@@ -34,14 +27,6 @@ npm run db:init
 
 # Start development server
 npm run dev
-```
-
-Should see:
-```
-✅ NEXUSX Authentication Service
-🔐 Running on http://localhost:5000
-📊 Database: Connected
-💾 Redis: Connected
 ```
 
 ## Step 3: Frontend Setup
@@ -160,60 +145,3 @@ Response will have `accessToken` - copy it.
 curl -X GET http://localhost:5000/auth/me \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
-
-## Stopping Services
-
-```bash
-# Stop database & cache
-docker-compose down
-
-# Stop backend
-Ctrl+C in backend terminal
-
-# Stop frontend
-Ctrl+C in frontend terminal
-```
-
-## Production Deployment
-
-### Before Going Live
-
-1. **Generate JWT Secret**
-   ```bash
-   # Use strong random string
-   openssl rand -base64 32
-   ```
-   Update `backend/.env`:
-   ```env
-   JWT_SECRET=<generated-string>
-   ```
-
-2. **Setup Managed Database**
-   - Use AWS RDS, Railway, or similar
-   - Enable SSL/TLS
-   - Update DB credentials in `.env`
-
-3. **Setup Managed Redis**
-   - Use AWS ElastiCache, Railway, or similar
-   - Update Redis credentials in `.env`
-
-   ```
-
-
-## Verification Checklist
-
-- [ ] Docker PostgreSQL running
-- [ ] Docker Redis running
-- [ ] `backend/.env` created
-- [ ] `frontend/.env.local` created
-- [ ] Database initialized: `npm run db:init`
-- [ ] Backend starts without errors
-- [ ] Frontend starts without errors
-- [ ] Can register new user
-- [ ] Can login with credentials
-- [ ] Token persists in localStorage
-- [ ] Can access protected routes
-- [ ] Can logout
- new cahnges
----
-See README.md for overview and usage examples.

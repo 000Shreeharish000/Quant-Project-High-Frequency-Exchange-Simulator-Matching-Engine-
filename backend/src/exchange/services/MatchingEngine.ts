@@ -136,7 +136,8 @@ export class MatchingEngine {
   }
 
   getTrades(symbol: string, limit = 100): Trade[] {
-    const trades = this.tradesBySymbol.get(symbol) ?? [];
+    const normalizedSymbol = this.normalizeSymbol(symbol);
+    const trades = this.tradesBySymbol.get(normalizedSymbol) ?? [];
     const normalizedLimit = Math.max(1, Math.floor(limit));
     return trades.slice(-normalizedLimit).map((trade) => structuredClone(trade));
   }
@@ -163,9 +164,10 @@ export class MatchingEngine {
   }
 
   getAnalytics(symbol: string): SymbolAnalytics {
-    const book = this.ensureBook(symbol);
+    const normalizedSymbol = this.normalizeSymbol(symbol);
+    const book = this.ensureBook(normalizedSymbol);
     const snapshot = book.snapshot(10);
-    const trades = this.tradesBySymbol.get(symbol) ?? [];
+    const trades = this.tradesBySymbol.get(normalizedSymbol) ?? [];
     const totalBidLiquidity = snapshot.bids.reduce((sum, level) => sum + level.quantity, 0);
     const totalAskLiquidity = snapshot.asks.reduce((sum, level) => sum + level.quantity, 0);
 
@@ -178,7 +180,7 @@ export class MatchingEngine {
     const totalLatency = trades.reduce((sum, trade) => sum + trade.latencyMs, 0);
 
     return {
-      symbol,
+      symbol: normalizedSymbol,
       spread: snapshot.spread,
       midPrice:
         snapshot.bestBid !== null && snapshot.bestAsk !== null
@@ -242,7 +244,7 @@ export class MatchingEngine {
       id: randomUUID(),
       clientOrderId: request.clientOrderId,
       traderId: request.traderId,
-      symbol: request.symbol.toUpperCase(),
+      symbol: this.normalizeSymbol(request.symbol),
       side: request.side,
       type: "limit",
       price: request.price,
@@ -412,8 +414,13 @@ export class MatchingEngine {
     account.updatedAt = new Date().toISOString();
   }
 
+
+  private normalizeSymbol(symbol: string): string {
+    return symbol.trim().toUpperCase();
+  }
+
   private ensureBook(symbol: string): OrderBook {
-    const normalized = symbol.toUpperCase();
+    const normalized = this.normalizeSymbol(symbol);
     const existing = this.books.get(normalized);
     if (existing) {
       return existing;

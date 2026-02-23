@@ -5,6 +5,7 @@ import {
   AccountState,
   CreateOrderRequest,
   EngineEvent,
+  EngineStats,
   Order,
   Side,
   SymbolAnalytics,
@@ -59,9 +60,15 @@ export class MatchingEngine {
     return () => this.emitter.off("event", listener);
   }
 
-  createOrUpdateAccount(traderId: string, cashDelta: number): AccountState {
+  createOrUpdateAccount(traderId: string, cashDelta: number): AccountState | null {
     const account = this.ensureAccount(traderId);
-    account.cash += cashDelta;
+    const nextCash = account.cash + cashDelta;
+
+    if (nextCash < account.reservedCash) {
+      return null;
+    }
+
+    account.cash = nextCash;
     account.updatedAt = new Date().toISOString();
     this.accounts.set(traderId, account);
     return structuredClone(account);
@@ -129,15 +136,44 @@ export class MatchingEngine {
   }
 
   getTrades(symbol: string, limit = 100): Trade[] {
-    const trades = this.tradesBySymbol.get(symbol) ?? [];
+
+    const normalizedSymbol = this.normalizeSymbol(symbol);
+    const trades = this.tradesBySymbol.get(normalizedSymbol) ?? [];
     const normalizedLimit = Math.max(1, Math.floor(limit));
     return trades.slice(-normalizedLimit).map((trade) => structuredClone(trade));
   }
 
-  getAnalytics(symbol: string): SymbolAnalytics {
-    const book = this.ensureBook(symbol);
-    const snapshot = book.snapshot(10);
+  getStats(): EngineStats {
+    const tradesBySymbol: Record<string, number> = {};
+    let tradeCount = 0;
+
+    for (const [symbol, trades] of this.tradesBySymbol.entries()) {
+      tradesBySymbol[symbol] = trades.length;
+      tradeCount += trades.length;
+    }
+
+    return {
+      queueDepth: this.queue.length,
+      openOrderCount: this.openOrders.size,
+      historicalOrderCount: this.orderHistory.size,
+      accountCount: this.accounts.size,
+      symbolCount: this.books.size,
+      tradeCount,
+      tradesBySymbol,
+      timestamp: new Date().toISOString(),
+    };
+
     const trades = this.tradesBySymbol.get(symbol) ?? [];
+    const normalizedLimit = Math.max(1, Math.floor(limit));
+    return trades.slice(-normalizedLimit).map((trade) => structuredClone(trade));
+
+  }
+
+  getAnalytics(symbol: string): SymbolAnalytics {
+    const normalizedSymbol = this.normalizeSymbol(symbol);
+    const book = this.ensureBook(normalizedSymbol);
+    const snapshot = book.snapshot(10);
+    const trades = this.tradesBySymbol.get(normalizedSymbol) ?? [];
     const totalBidLiquidity = snapshot.bids.reduce((sum, level) => sum + level.quantity, 0);
     const totalAskLiquidity = snapshot.asks.reduce((sum, level) => sum + level.quantity, 0);
 
@@ -150,7 +186,7 @@ export class MatchingEngine {
     const totalLatency = trades.reduce((sum, trade) => sum + trade.latencyMs, 0);
 
     return {
-      symbol,
+      symbol: normalizedSymbol,
       spread: snapshot.spread,
       midPrice:
         snapshot.bestBid !== null && snapshot.bestAsk !== null
@@ -214,6 +250,8 @@ export class MatchingEngine {
       id: randomUUID(),
       clientOrderId: request.clientOrderId,
       traderId: request.traderId,
+
+      symbol: this.normalizeSymbol(request.symbol),
       symbol: request.symbol.toUpperCase(),
       side: request.side,
       type: "limit",
@@ -384,8 +422,13 @@ export class MatchingEngine {
     account.updatedAt = new Date().toISOString();
   }
 
+
+  private normalizeSymbol(symbol: string): string {
+    return symbol.trim().toUpperCase();
+  }
+
   private ensureBook(symbol: string): OrderBook {
-    const normalized = symbol.toUpperCase();
+    const normalized = this.normalizeSymbol(symbol);
     const existing = this.books.get(normalized);
     if (existing) {
       return existing;

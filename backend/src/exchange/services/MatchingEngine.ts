@@ -5,6 +5,7 @@ import {
   AccountState,
   CreateOrderRequest,
   EngineEvent,
+  EngineStats,
   Order,
   Side,
   SymbolAnalytics,
@@ -24,11 +25,13 @@ interface QueuedCommand {
 interface EngineOptions {
   minLatencyMs: number;
   maxLatencyMs: number;
+  maxTradesPerSymbol: number;
 }
 
 const DEFAULT_OPTIONS: EngineOptions = {
   minLatencyMs: 2,
   maxLatencyMs: 15,
+  maxTradesPerSymbol: 2000,
 };
 
 export class MatchingEngine {
@@ -43,16 +46,29 @@ export class MatchingEngine {
   private flushTimer: NodeJS.Timeout | null = null;
   private sequence = 0;
 
-  constructor(private readonly options: EngineOptions = DEFAULT_OPTIONS) {}
+  constructor(private readonly options: EngineOptions = DEFAULT_OPTIONS) {
+    if (options.minLatencyMs < 0 || options.maxLatencyMs < 0) {
+      throw new Error("Engine latency configuration cannot be negative");
+    }
+    if (options.maxTradesPerSymbol <= 0) {
+      throw new Error("Engine trade history limit must be positive");
+    }
+  }
 
   onEvent(listener: (event: EngineEvent) => void): () => void {
     this.emitter.on("event", listener);
     return () => this.emitter.off("event", listener);
   }
 
-  createOrUpdateAccount(traderId: string, cashDelta: number): AccountState {
+  createOrUpdateAccount(traderId: string, cashDelta: number): AccountState | null {
     const account = this.ensureAccount(traderId);
-    account.cash += cashDelta;
+    const nextCash = account.cash + cashDelta;
+
+    if (nextCash < account.reservedCash) {
+      return null;
+    }
+
+    account.cash = nextCash;
     account.updatedAt = new Date().toISOString();
     this.accounts.set(traderId, account);
     return structuredClone(account);
@@ -115,12 +131,35 @@ export class MatchingEngine {
   }
 
   getOrderBook(symbol: string, depth = 20) {
-    return this.ensureBook(symbol).snapshot(depth);
+    const normalizedDepth = Math.max(1, Math.floor(depth));
+    return this.ensureBook(symbol).snapshot(normalizedDepth);
   }
 
   getTrades(symbol: string, limit = 100): Trade[] {
     const trades = this.tradesBySymbol.get(symbol) ?? [];
-    return trades.slice(-limit).map((trade) => structuredClone(trade));
+    const normalizedLimit = Math.max(1, Math.floor(limit));
+    return trades.slice(-normalizedLimit).map((trade) => structuredClone(trade));
+  }
+
+  getStats(): EngineStats {
+    const tradesBySymbol: Record<string, number> = {};
+    let tradeCount = 0;
+
+    for (const [symbol, trades] of this.tradesBySymbol.entries()) {
+      tradesBySymbol[symbol] = trades.length;
+      tradeCount += trades.length;
+    }
+
+    return {
+      queueDepth: this.queue.length,
+      openOrderCount: this.openOrders.size,
+      historicalOrderCount: this.orderHistory.size,
+      accountCount: this.accounts.size,
+      symbolCount: this.books.size,
+      tradeCount,
+      tradesBySymbol,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   getAnalytics(symbol: string): SymbolAnalytics {
@@ -203,7 +242,7 @@ export class MatchingEngine {
       id: randomUUID(),
       clientOrderId: request.clientOrderId,
       traderId: request.traderId,
-      symbol: request.symbol,
+      symbol: request.symbol.toUpperCase(),
       side: request.side,
       type: "limit",
       price: request.price,
@@ -294,6 +333,10 @@ export class MatchingEngine {
 
     const symbolTrades = this.tradesBySymbol.get(order.symbol) ?? [];
     symbolTrades.push(...trades);
+    if (symbolTrades.length > this.options.maxTradesPerSymbol) {
+      const excess = symbolTrades.length - this.options.maxTradesPerSymbol;
+      symbolTrades.splice(0, excess);
+    }
     this.tradesBySymbol.set(order.symbol, symbolTrades);
 
     this.emit({ type: "order_accepted", payload: order, timestamp: new Date().toISOString() });

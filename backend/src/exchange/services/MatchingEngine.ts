@@ -136,6 +136,7 @@ export class MatchingEngine {
   }
 
   getTrades(symbol: string, limit = 100): Trade[] {
+
     const normalizedSymbol = this.normalizeSymbol(symbol);
     const trades = this.tradesBySymbol.get(normalizedSymbol) ?? [];
     const normalizedLimit = Math.max(1, Math.floor(limit));
@@ -161,6 +162,11 @@ export class MatchingEngine {
       tradesBySymbol,
       timestamp: new Date().toISOString(),
     };
+
+    const trades = this.tradesBySymbol.get(symbol) ?? [];
+    const normalizedLimit = Math.max(1, Math.floor(limit));
+    return trades.slice(-normalizedLimit).map((trade) => structuredClone(trade));
+
   }
 
   getAnalytics(symbol: string): SymbolAnalytics {
@@ -244,7 +250,9 @@ export class MatchingEngine {
       id: randomUUID(),
       clientOrderId: request.clientOrderId,
       traderId: request.traderId,
+
       symbol: this.normalizeSymbol(request.symbol),
+      symbol: request.symbol.toUpperCase(),
       side: request.side,
       type: "limit",
       price: request.price,

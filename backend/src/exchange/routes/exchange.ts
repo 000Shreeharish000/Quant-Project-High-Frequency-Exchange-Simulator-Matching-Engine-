@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { matchingEngine } from "../services/MatchingEngine.js";
+import type { CreateOrderRequest } from "../domain/types.js";
 
 const router = Router();
 
@@ -11,7 +12,7 @@ const accountSchema = z.object({
 
 const orderSchema = z.object({
   traderId: z.string().min(2),
-  symbol: z.string().min(2).max(15),
+  symbol: z.string().trim().toUpperCase().min(2).max(15),
   side: z.enum(["buy", "sell"]),
   price: z.number().positive(),
   quantity: z.number().positive(),
@@ -21,6 +22,18 @@ const orderSchema = z.object({
 
 const cancelSchema = z.object({
   traderId: z.string().min(2),
+});
+
+const orderBookQuerySchema = z.object({
+  depth: z.coerce.number().int().min(1).max(200).default(20),
+});
+
+const tradesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+});
+
+const symbolParamSchema = z.object({
+  symbol: z.string().trim().min(2).max(15),
 });
 
 router.post("/accounts/fund", (req, res) => {
@@ -34,6 +47,13 @@ router.post("/accounts/fund", (req, res) => {
   }
 
   const account = matchingEngine.createOrUpdateAccount(parsed.data.traderId, parsed.data.cashDelta);
+  if (!account) {
+    return res.status(422).json({
+      success: false,
+      error: "Funding operation would violate reserved cash constraints",
+    });
+  }
+
   return res.status(200).json({ success: true, data: account });
 });
 
@@ -55,7 +75,7 @@ router.post("/orders", async (req, res) => {
     });
   }
 
-  const result = await matchingEngine.enqueueOrder(parsed.data);
+  const result = await matchingEngine.enqueueOrder(parsed.data as CreateOrderRequest);
 
   if (!result.accepted) {
     return res.status(422).json({ success: false, error: result.reason });
@@ -89,20 +109,68 @@ router.delete("/orders/:orderId", (req, res) => {
 });
 
 router.get("/orderbook/:symbol", (req, res) => {
-  const depth = Number.parseInt(String(req.query.depth ?? "20"), 10);
-  const snapshot = matchingEngine.getOrderBook(req.params.symbol, Number.isNaN(depth) ? 20 : depth);
+  const parsedParams = symbolParamSchema.safeParse(req.params);
+  if (!parsedParams.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid symbol path params",
+      details: parsedParams.error.flatten(),
+    });
+  }
+
+  const parsedQuery = orderBookQuerySchema.safeParse(req.query);
+  if (!parsedQuery.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid orderbook query params",
+      details: parsedQuery.error.flatten(),
+    });
+  }
+
+  const snapshot = matchingEngine.getOrderBook(parsedParams.data.symbol, parsedQuery.data.depth);
   return res.status(200).json({ success: true, data: snapshot });
 });
 
 router.get("/trades/:symbol", (req, res) => {
-  const limit = Number.parseInt(String(req.query.limit ?? "100"), 10);
-  const trades = matchingEngine.getTrades(req.params.symbol, Number.isNaN(limit) ? 100 : limit);
+  const parsedParams = symbolParamSchema.safeParse(req.params);
+  if (!parsedParams.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid symbol path params",
+      details: parsedParams.error.flatten(),
+    });
+  }
+
+  const parsedQuery = tradesQuerySchema.safeParse(req.query);
+  if (!parsedQuery.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid trades query params",
+      details: parsedQuery.error.flatten(),
+    });
+  }
+
+  const trades = matchingEngine.getTrades(parsedParams.data.symbol, parsedQuery.data.limit);
   return res.status(200).json({ success: true, data: trades });
 });
 
 router.get("/analytics/:symbol", (req, res) => {
-  const analytics = matchingEngine.getAnalytics(req.params.symbol);
+  const parsedParams = symbolParamSchema.safeParse(req.params);
+  if (!parsedParams.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid symbol path params",
+      details: parsedParams.error.flatten(),
+    });
+  }
+
+  const analytics = matchingEngine.getAnalytics(parsedParams.data.symbol);
   return res.status(200).json({ success: true, data: analytics });
+});
+
+router.get("/stats", (_req, res) => {
+  const stats = matchingEngine.getStats();
+  return res.status(200).json({ success: true, data: stats });
 });
 
 router.get("/events", (req, res) => {

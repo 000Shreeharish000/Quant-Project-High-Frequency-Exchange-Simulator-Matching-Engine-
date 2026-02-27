@@ -89,3 +89,14 @@ export interface EngineEvent {
   payload: unknown;
   timestamp: string;
 }
+
+export interface EngineStats {
+  queueDepth: number;
+  openOrderCount: number;
+  historicalOrderCount: number;
+  accountCount: number;
+  symbolCount: number;
+  tradeCount: number;
+  tradesBySymbol: Record<string, number>;
+  timestamp: string;
+}

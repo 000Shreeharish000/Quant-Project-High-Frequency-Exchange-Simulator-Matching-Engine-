@@ -12,7 +12,7 @@ const accountSchema = z.object({
 
 const orderSchema: z.ZodType<CreateOrderRequest> = z.object({
   traderId: z.string().min(2),
-  symbol: z.string().min(2).max(15),
+  symbol: z.string().trim().toUpperCase().min(2).max(15),
   side: z.enum(["buy", "sell"]),
   price: z.number().positive(),
   quantity: z.number().positive(),
@@ -74,7 +74,7 @@ router.post("/orders", async (req, res) => {
     });
   }
 
-  const result = await matchingEngine.enqueueOrder(parsed.data);
+  const result = await matchingEngine.enqueueOrder(parsed.data as CreateOrderRequest);
 
   if (!result.accepted) {
     return res.status(422).json({ success: false, error: result.reason });

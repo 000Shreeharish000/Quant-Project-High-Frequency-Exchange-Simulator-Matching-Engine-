@@ -242,4 +242,11 @@ const Trade = () => {
   );
 };
 
+const Metric = ({ title, value }: { title: string; value: string }) => (
+  <div className="rounded-lg border bg-card p-4">
+    <p className="text-xs text-muted-foreground">{title}</p>
+    <p className="text-xl font-semibold text-card-foreground">{value}</p>
+  </div>
+);
+
 export default Trade;

@@ -31,7 +31,7 @@ const Signup = () => {
   });
   const [errors, setErrors] = useState<SignupErrors>({});
 
-  const apiBaseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;

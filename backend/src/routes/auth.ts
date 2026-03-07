@@ -9,29 +9,31 @@ import config from "../config/index.js";
 
 const router = Router();
 
-// Configure Google OAuth strategy
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: config.google.clientId,
-      clientSecret: config.google.clientSecret,
-      callbackURL: config.google.callbackUrl,
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        const authResult = await AuthService.googleAuth({
-          id: profile.id,
-          displayName: profile.displayName,
-          emails: profile.emails,
-          photos: profile.photos,
-        });
-        return done(null, { authResult });
-      } catch (error) {
-        return done(error);
+// Configure Google OAuth strategy only when configured
+if (config.google.clientId && config.google.clientSecret) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: config.google.clientId,
+        clientSecret: config.google.clientSecret,
+        callbackURL: config.google.callbackUrl,
+      },
+      async (_accessToken, _refreshToken, profile, done) => {
+        try {
+          const authResult = await AuthService.googleAuth({
+            id: profile.id,
+            displayName: profile.displayName,
+            emails: profile.emails,
+            photos: profile.photos,
+          });
+          return done(null, { authResult });
+        } catch (error) {
+          return done(error as Error);
+        }
       }
-    }
-  )
-);
+    )
+  );
+}
 
 passport.serializeUser((user: any, done) => {
   done(null, user);
@@ -47,7 +49,7 @@ passport.deserializeUser((user: any, done) => {
  * POST /auth/register
  * Register with email and password
  */
-router.post("/register", authLimiter, async (req, res) => {
+router.post("/register", authLimiter, (req, res) => {
   AuthController.register(req, res);
 });
 
@@ -55,7 +57,7 @@ router.post("/register", authLimiter, async (req, res) => {
  * POST /auth/login
  * Login with email and password
  */
-router.post("/login", authLimiter, async (req, res) => {
+router.post("/login", authLimiter, (req, res) => {
   AuthController.login(req, res);
 });
 
@@ -63,7 +65,7 @@ router.post("/login", authLimiter, async (req, res) => {
  * POST /auth/logout
  * Logout (requires authentication)
  */
-router.post("/logout", authMiddleware, async (req, res) => {
+router.post("/logout", authMiddleware, (req, res) => {
   AuthController.logout(req, res);
 });
 
@@ -71,7 +73,7 @@ router.post("/logout", authMiddleware, async (req, res) => {
  * GET /auth/me
  * Get current user profile (requires authentication)
  */
-router.get("/me", authMiddleware, async (req, res) => {
+router.get("/me", authMiddleware, (req, res) => {
   AuthController.me(req, res);
 });
 

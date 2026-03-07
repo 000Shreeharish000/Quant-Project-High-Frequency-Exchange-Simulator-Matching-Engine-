@@ -17,7 +17,7 @@ const Login = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const apiBaseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => {
     const token = searchParams.get("token");

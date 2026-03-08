@@ -1,13 +1,32 @@
 import { Response } from "express";
+import { z } from "zod";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import AuthService from "../services/AuthService.js";
 import UserModel from "../models/User.js";
-import { decodeToken } from "../utils/jwt.js";
+import config from "../config/index.js";
+
+const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+  firstName: z.string().trim().min(1).max(100).optional(),
+  lastName: z.string().trim().min(1).max(100).optional(),
+});
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
 
 export class AuthController {
   static async register(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      const parsed = registerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ success: false, error: "Invalid registration payload" });
+        return;
+      }
+
+      const { email, password, firstName, lastName } = parsed.data;
 
       const result = await AuthService.register(email, password, firstName, lastName);
 
@@ -26,7 +45,13 @@ export class AuthController {
 
   static async login(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const { email, password } = req.body;
+      const parsed = loginSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ success: false, error: "Invalid login payload" });
+        return;
+      }
+
+      const { email, password } = parsed.data;
 
       const result = await AuthService.login(email, password);
 
@@ -97,7 +122,6 @@ export class AuthController {
         return;
       }
 
-      // Get the auth result from passport (added in the route)
       const authResult = (req as any).authResult;
 
       if (!authResult) {
@@ -105,14 +129,11 @@ export class AuthController {
         return;
       }
 
-      // Redirect to frontend with token
-      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
       res.redirect(
-        `${frontendUrl}/trade?token=${authResult.accessToken}&user=${encodeURIComponent(JSON.stringify(authResult.user))}`
+        `${config.frontend.url}/trade?token=${authResult.accessToken}&user=${encodeURIComponent(JSON.stringify(authResult.user))}`
       );
-    } catch (error: any) {
-      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-      res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+    } catch {
+      res.redirect(`${config.frontend.url}/login?error=google_auth_failed`);
     }
   }
 }

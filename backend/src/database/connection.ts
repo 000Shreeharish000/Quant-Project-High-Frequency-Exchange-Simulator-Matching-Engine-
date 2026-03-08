@@ -7,6 +7,9 @@ const pool = new Pool({
   database: config.database.name,
   user: config.database.user,
   password: config.database.password,
+  max: config.database.maxConnections,
+  idleTimeoutMillis: config.database.idleTimeoutMs,
+  connectionTimeoutMillis: config.database.connectionTimeoutMs,
 });
 
 export async function query(text: string, params?: any[]) {

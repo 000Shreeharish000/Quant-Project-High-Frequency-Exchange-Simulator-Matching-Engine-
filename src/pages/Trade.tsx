@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiClient } from "@/utils/ApiClient";
 
@@ -61,18 +61,21 @@ const numberOrDash = (value: number | null, digits = 2): string => {
 };
 
 const Trade = () => {
-  const [symbol, setSymbol] = useState("BTCUSD");
+  const [symbolInput, setSymbolInput] = useState("BTCUSD");
+  const [activeSymbol, setActiveSymbol] = useState("BTCUSD");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastRequestId = useRef(0);
 
   const [orderBook, setOrderBook] = useState<OrderBookSnapshot | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [analytics, setAnalytics] = useState<SymbolAnalytics | null>(null);
   const [stats, setStats] = useState<EngineStats | null>(null);
 
-  const activeSymbol = useMemo(() => symbol.trim().toUpperCase() || "BTCUSD", [symbol]);
+  const normalizedInput = useMemo(() => symbolInput.trim().toUpperCase() || "BTCUSD", [symbolInput]);
 
-  const fetchMarketData = async (targetSymbol = activeSymbol) => {
+  const fetchMarketData = useCallback(async (targetSymbol: string) => {
+    const requestId = ++lastRequestId.current;
     setLoading(true);
     setError(null);
 
@@ -94,22 +97,36 @@ const Trade = () => {
         );
       }
 
+      if (requestId !== lastRequestId.current) {
+        return;
+      }
+
       setOrderBook(orderBookRes.data ?? null);
       setTrades(tradesRes.data ?? []);
       setAnalytics(analyticsRes.data ?? null);
       setStats(statsRes.data ?? null);
     } catch (fetchError) {
+      if (requestId !== lastRequestId.current) {
+        return;
+      }
       setError(fetchError instanceof Error ? fetchError.message : "Failed to fetch exchange data");
     } finally {
-      setLoading(false);
+      if (requestId === lastRequestId.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchMarketData();
-    const timer = window.setInterval(() => fetchMarketData(), 5000);
+    fetchMarketData(activeSymbol);
+    const timer = window.setInterval(() => fetchMarketData(activeSymbol), 5000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [activeSymbol, fetchMarketData]);
+
+  const applySymbol = () => {
+    setActiveSymbol(normalizedInput);
+    setSymbolInput(normalizedInput);
+  };
 
   return (
     <div className="min-h-screen bg-background px-4 py-8">
@@ -122,14 +139,25 @@ const Trade = () => {
 
           <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
             <input
-              value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
+              value={symbolInput}
+              onChange={(e) => setSymbolInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  applySymbol();
+                }
+              }}
               placeholder="Symbol (e.g. BTCUSD)"
               className="h-10 rounded-md border bg-background px-3 text-sm"
             />
             <button
-              onClick={() => fetchMarketData()}
+              onClick={applySymbol}
               className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Apply Symbol
+            </button>
+            <button
+              onClick={() => fetchMarketData(activeSymbol)}
+              className="h-10 rounded-md border px-4 text-sm font-medium hover:bg-accent"
             >
               {loading ? "Refreshing..." : "Refresh"}
             </button>
@@ -213,5 +241,12 @@ const Trade = () => {
     </div>
   );
 };
+
+const Metric = ({ title, value }: { title: string; value: string }) => (
+  <div className="rounded-lg border bg-card p-4">
+    <p className="text-xs text-muted-foreground">{title}</p>
+    <p className="text-xl font-semibold text-card-foreground">{value}</p>
+  </div>
+);
 
 export default Trade;

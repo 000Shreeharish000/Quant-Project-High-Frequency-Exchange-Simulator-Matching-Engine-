@@ -1,6 +1,6 @@
 import AuthService from './AuthService';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export interface ApiResponse<T> {
   success: boolean;

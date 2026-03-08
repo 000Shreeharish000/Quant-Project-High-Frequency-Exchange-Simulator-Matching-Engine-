@@ -167,8 +167,6 @@ export class MatchingEngine {
     const normalizedLimit = Math.max(1, Math.floor(limit));
     return trades.slice(-normalizedLimit).map((trade) => structuredClone(trade));
 
-  }
-
   getAnalytics(symbol: string): SymbolAnalytics {
     const normalizedSymbol = this.normalizeSymbol(symbol);
     const book = this.ensureBook(normalizedSymbol);
@@ -252,7 +250,11 @@ export class MatchingEngine {
       traderId: request.traderId,
 
       symbol: this.normalizeSymbol(request.symbol),
+
+
+      symbol: this.normalizeSymbol(request.symbol),
       symbol: request.symbol.toUpperCase(),
+
       side: request.side,
       type: "limit",
       price: request.price,

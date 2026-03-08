@@ -4,11 +4,6 @@ export async function initializeDatabase() {
   try {
     console.log("🔄 Initializing database schema...");
 
-    // Drop existing table if exists (for development)
-    await query(`
-      DROP TABLE IF EXISTS users CASCADE;
-    `);
-
     // Create users table
     await query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -25,8 +20,10 @@ export async function initializeDatabase() {
         is_active BOOLEAN DEFAULT true
       );
 
-      CREATE INDEX idx_users_email ON users(email);
-      CREATE INDEX idx_users_google_id ON users(google_id);
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users(LOWER(email));
+      CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
+      CREATE INDEX IF NOT EXISTS idx_users_active_created_at ON users(is_active, created_at DESC);
     `);
 
     console.log("✅ Database schema initialized successfully!");

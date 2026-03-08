@@ -1,11 +1,4 @@
-# Setup Instructions
 
-## Prerequisites
-
-- Docker & Docker Compose
-- Node.js 18+
-- PostgreSQL 12+ (or use Docker)
-- Redis 6+ (or use Docker)
 
 ## Step 1: Start Database & Cache
 
@@ -36,14 +29,6 @@ npm run db:init
 npm run dev
 ```
 
-Should see:
-```
-✅ NEXUSX Authentication Service
-🔐 Running on http://localhost:5000
-📊 Database: Connected
-💾 Redis: Connected
-```
-
 ## Step 3: Frontend Setup
 
 In a new terminal (keep backend running):
@@ -66,15 +51,6 @@ Should see `http://localhost:5173` is ready.
 4. Click "Create Account"
 5. Should redirect to `/trade` ✅
 
-## Google OAuth Setup (Optional)
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create new project
-3. Enable "Google+ API"
-4. OAuth consent screen → Create
-5. Credentials → OAuth 2.0 Client ID → Web application
-6. Authorized redirect URIs → Add:
-   ```
    http://localhost:5000/auth/google/callback
    ```
 7. Copy Client ID and Secret
@@ -169,87 +145,3 @@ Response will have `accessToken` - copy it.
 curl -X GET http://localhost:5000/auth/me \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
-
-## Stopping Services
-
-```bash
-# Stop database & cache
-docker-compose down
-
-# Stop backend
-Ctrl+C in backend terminal
-
-# Stop frontend
-Ctrl+C in frontend terminal
-```
-
-## Production Deployment
-
-### Before Going Live
-
-1. **Generate JWT Secret**
-   ```bash
-   # Use strong random string
-   openssl rand -base64 32
-   ```
-   Update `backend/.env`:
-   ```env
-   JWT_SECRET=<generated-string>
-   ```
-
-2. **Setup Managed Database**
-   - Use AWS RDS, Railway, or similar
-   - Enable SSL/TLS
-   - Update DB credentials in `.env`
-
-3. **Setup Managed Redis**
-   - Use AWS ElastiCache, Railway, or similar
-   - Update Redis credentials in `.env`
-
-4. **Google OAuth**
-   - Add production domain to allowed redirects
-   - Update `GOOGLE_CALLBACK_URL` to production
-
-5. **Frontend Domain**
-   ```env
-   FRONTEND_URL=https://yourdomain.com
-   ```
-
-6. **Build & Deploy**
-   ```bash
-   cd backend
-   npm run build
-   # Deploy dist/ folder
-   
-   # Frontend
-   npm run build
-   # Deploy to Vercel, Netlify, etc.
-   ```
-
-### Recommended Platforms
-
-- **Backend**: Railway, Vercel, Heroku, AWS
-- **Database**: Railway, AWS RDS, Heroku Postgres
-- **Redis**: Railway, AWS ElastiCache
-- **Frontend**: Vercel, Netlify
-
-## Verification Checklist
-
-- [ ] Docker PostgreSQL running
-- [ ] Docker Redis running
-- [ ] `backend/.env` created
-- [ ] `frontend/.env.local` created
-- [ ] Database initialized: `npm run db:init`
-- [ ] Backend starts without errors
-- [ ] Frontend starts without errors
-- [ ] Can register new user
-- [ ] Can login with credentials
-- [ ] Token persists in localStorage
-- [ ] Can access protected routes
-- [ ] Can logout
-
-All checked? You're good to go! ✅
-
----
-
-See README.md for overview and usage examples.

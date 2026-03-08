@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
 import UserModel from "../models/User.js";
-import { hashPassword, comparePassword } from "../utils/password.js";
+import { hashPassword, comparePassword, isStrongPassword } from "../utils/password.js";
 import { generateToken } from "../utils/jwt.js";
-import { storeSession, invalidateSession } from "../utils/redis.js";
+import { storeSession, invalidateSession, validateSession as validateRedisSession } from "../utils/redis.js";
 import config from "../config/index.js";
 
 export interface AuthResponse {
@@ -33,12 +33,14 @@ export class AuthService {
       throw new Error("Invalid email format");
     }
 
-    if (password.length < 6) {
-      throw new Error("Password must be at least 6 characters");
+    if (!isStrongPassword(password)) {
+      throw new Error("Password must be strong and include uppercase, lowercase, number, and symbol");
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Check if user exists
-    const existingUser = await UserModel.findByEmail(email);
+    const existingUser = await UserModel.findByEmail(normalizedEmail);
     if (existingUser) {
       throw new Error("Email already registered");
     }
@@ -48,7 +50,7 @@ export class AuthService {
 
     // Create user
     const user = await UserModel.create({
-      email: email.toLowerCase(),
+      email: normalizedEmail,
       password_hash: passwordHash,
       first_name: firstName,
       last_name: lastName,
@@ -87,15 +89,17 @@ export class AuthService {
       throw new Error("Email and password are required");
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Find user
-    const user = await UserModel.findByEmail(email);
+    const user = await UserModel.findByEmail(normalizedEmail);
     if (!user) {
       throw new Error("Invalid email or password");
     }
 
     // Check if user has password (email auth method)
     if (!user.password_hash) {
-      throw new Error("This account uses a different authentication method");
+      throw new Error("Invalid email or password");
     }
 
     // Verify password
@@ -140,6 +144,7 @@ export class AuthService {
     const email = profile.emails?.[0]?.value;
     const displayName = profile.displayName || "";
     const profilePictureUrl = profile.photos?.[0]?.value;
+    const normalizedEmail = email.trim().toLowerCase();
 
     if (!email) {
       throw new Error("Email not provided by Google");
@@ -156,7 +161,7 @@ export class AuthService {
         // Create new user
         const [firstName, lastName] = displayName.split(" ");
         user = await UserModel.create({
-          email: email.toLowerCase(),
+          email: normalizedEmail,
           google_id: googleId,
           first_name: firstName,
           last_name: lastName,
@@ -208,7 +213,7 @@ export class AuthService {
   }
 
   static async validateSession(tokenId: string, userId: string): Promise<boolean> {
-    const storedUserId = await storeSession(userId, tokenId);
+    const storedUserId = await validateRedisSession(tokenId);
     return storedUserId === userId;
   }
 }

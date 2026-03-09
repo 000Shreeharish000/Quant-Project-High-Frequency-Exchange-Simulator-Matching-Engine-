@@ -69,7 +69,7 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      await AuthService.login(email.toLowerCase(), password);
+      await AuthService.login(email.trim().toLowerCase(), password);
       navigate("/trade");
     } catch (error: unknown) {
       setErrors((prev) => ({

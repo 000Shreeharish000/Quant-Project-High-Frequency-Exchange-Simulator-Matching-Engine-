@@ -35,7 +35,8 @@ const Signup = () => {
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const normalizedValue = name === "email" ? value.trimStart().toLowerCase() : value.trimStart();
+    setFormData((prev) => ({ ...prev, [name]: normalizedValue }));
     if (errors[name as keyof SignupErrors]) {
       setErrors((prev) => ({ ...prev, [name]: undefined }));
     }

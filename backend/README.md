@@ -41,9 +41,21 @@ High-performance exchange simulator backend with deterministic matching, account
 docker-compose up -d
 
 cd backend
+cp .env.example .env
 npm install
 npm run build
 npm run dev
 ```
 
 > If PostgreSQL/Redis are unavailable, the exchange simulator still starts in-memory and logs warnings.
+
+
+## Operational endpoint
+
+- `GET /health` returns service status, ISO timestamp, and process uptime in seconds.
+
+### Check health
+
+```bash
+curl http://localhost:5000/health
+```

@@ -140,7 +140,7 @@ const Trade = () => {
           <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
             <input
               value={symbolInput}
-              onChange={(e) => setSymbolInput(e.target.value)}
+              onChange={(e) => setSymbolInput(e.target.value.toUpperCase().replace(/\s+/g, ""))}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   applySymbol();
@@ -157,7 +157,8 @@ const Trade = () => {
             </button>
             <button
               onClick={() => fetchMarketData(activeSymbol)}
-              className="h-10 rounded-md border px-4 text-sm font-medium hover:bg-accent"
+              disabled={loading}
+              className="h-10 rounded-md border px-4 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Refreshing..." : "Refresh"}
             </button>

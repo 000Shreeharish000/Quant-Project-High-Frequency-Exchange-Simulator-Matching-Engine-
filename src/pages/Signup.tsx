@@ -35,7 +35,8 @@ const Signup = () => {
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const normalizedValue = name === "email" ? value.trimStart().toLowerCase() : value.trimStart();
+    setFormData((prev) => ({ ...prev, [name]: normalizedValue }));
     if (errors[name as keyof SignupErrors]) {
       setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
@@ -111,30 +112,30 @@ const Signup = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="firstName" className="block text-sm font-medium text-muted-foreground mb-1.5">First Name</label>
-            <input id="firstName" type="text" name="firstName" value={formData.firstName} onChange={handleChange} className="input-exchange" disabled={isLoading} />
+            <input id="firstName" type="text" name="firstName" autoComplete="given-name" value={formData.firstName} onChange={handleChange} className="input-exchange" disabled={isLoading} />
             {errors.firstName && <p className="error-text">{errors.firstName}</p>}
           </div>
 
           <div>
             <label htmlFor="lastName" className="block text-sm font-medium text-muted-foreground mb-1.5">Last Name</label>
-            <input id="lastName" type="text" name="lastName" value={formData.lastName} onChange={handleChange} className="input-exchange" disabled={isLoading} />
+            <input id="lastName" type="text" name="lastName" autoComplete="family-name" value={formData.lastName} onChange={handleChange} className="input-exchange" disabled={isLoading} />
           </div>
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-muted-foreground mb-1.5">Email</label>
-            <input id="email" type="email" name="email" value={formData.email} onChange={handleChange} className="input-exchange" disabled={isLoading} />
+            <input id="email" type="email" name="email" autoComplete="email" value={formData.email} onChange={handleChange} className="input-exchange" disabled={isLoading} />
             {errors.email && <p className="error-text">{errors.email}</p>}
           </div>
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-muted-foreground mb-1.5">Password</label>
-            <input id="password" type="password" name="password" value={formData.password} onChange={handleChange} className="input-exchange" disabled={isLoading} />
+            <input id="password" type="password" name="password" autoComplete="new-password" value={formData.password} onChange={handleChange} className="input-exchange" disabled={isLoading} />
             {errors.password && <p className="error-text">{errors.password}</p>}
           </div>
 
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-muted-foreground mb-1.5">Confirm Password</label>
-            <input id="confirmPassword" type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="input-exchange" disabled={isLoading} />
+            <input id="confirmPassword" type="password" name="confirmPassword" autoComplete="new-password" value={formData.confirmPassword} onChange={handleChange} className="input-exchange" disabled={isLoading} />
             {errors.confirmPassword && <p className="error-text">{errors.confirmPassword}</p>}
           </div>
 

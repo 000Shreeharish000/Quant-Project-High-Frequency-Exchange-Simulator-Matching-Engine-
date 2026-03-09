@@ -9,6 +9,7 @@ import exchangeRoutes from "./exchange/routes/exchange.js";
 import { generalLimiter } from "./middleware/rateLimit.js";
 
 const app: Express = express();
+const BODY_LIMIT = "256kb";
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
@@ -24,8 +25,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: "256kb" }));
-app.use(express.urlencoded({ extended: true, limit: "256kb" }));
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
 app.use(
   cors({
@@ -33,6 +34,8 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
+    maxAge: 86400,
   })
 );
 
@@ -43,9 +46,12 @@ app.use("/auth", authRoutes);
 app.use("/exchange", exchangeRoutes);
 
 app.get("/health", (_req: Request, res: Response) => {
+  res.setHeader("Cache-Control", "no-store");
   res.json({
     status: "ok",
     service: "nexusx-exchange-simulator",
+    environment: config.server.nodeEnv,
+    uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
   });
 });
@@ -53,6 +59,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: "Route not found",
+    method: req.method,
     path: req.path,
   });
 });
@@ -67,6 +74,7 @@ app.use((err: Error, _req: Request, res: Response) => {
 
 async function startServer() {
   console.log("🚀 Starting NEXUSX Exchange Backend...");
+  console.log(`🧭 Environment: ${config.server.nodeEnv}`);
 
   let dbStatus = "not_configured";
   let redisStatus = "not_configured";

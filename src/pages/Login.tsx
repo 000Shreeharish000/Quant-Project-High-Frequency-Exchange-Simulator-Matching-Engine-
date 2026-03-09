@@ -69,7 +69,7 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      await AuthService.login(email.toLowerCase(), password);
+      await AuthService.login(email.trim().toLowerCase(), password);
       navigate("/trade");
     } catch (error: unknown) {
       setErrors((prev) => ({
@@ -114,9 +114,10 @@ const Login = () => {
             <input
               id="email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => {
-                setEmail(e.target.value);
+                setEmail(e.target.value.trimStart());
                 if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
               }}
               placeholder="trader@example.com"
@@ -131,6 +132,7 @@ const Login = () => {
             <input
               id="password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -143,7 +145,7 @@ const Login = () => {
             {errors.password && <p className="error-text">{errors.password}</p>}
           </div>
 
-          <button type="submit" disabled={isLoading} className="btn-primary mt-6 w-full">
+          <button type="submit" aria-busy={isLoading} disabled={isLoading} className="btn-primary mt-6 w-full">
             {isLoading ? "Signing in..." : "Sign In"}
           </button>
         </form>

@@ -29,6 +29,7 @@ export class AuthService {
     try {
       return JSON.parse(userStr);
     } catch {
+      localStorage.removeItem("user");
       return null;
     }
   }

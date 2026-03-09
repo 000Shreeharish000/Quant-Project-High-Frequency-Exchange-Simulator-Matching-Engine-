@@ -33,7 +33,8 @@ export class ApiClient {
         headers,
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      const data = contentType.includes('application/json') ? await response.json() : {};
 
       // Handle 401 - token expired or invalid
       if (response.status === 401) {
@@ -44,7 +45,7 @@ export class ApiClient {
       return {
         success: response.ok,
         data: data.data || data,
-        error: data.error || data.message,
+        error: data.error || data.message || (!response.ok ? response.statusText : undefined),
       };
     } catch (error) {
       return {

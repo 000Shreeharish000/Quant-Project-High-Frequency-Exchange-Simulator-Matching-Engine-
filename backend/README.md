@@ -52,13 +52,10 @@ npm run dev
 
 ## Operational endpoint
 
-- `GET /health` returns service status, runtime environment, ISO timestamp, and process uptime in seconds.
+- `GET /health` returns service status, ISO timestamp, and process uptime in seconds.
 
 ### Check health
 
 ```bash
 curl http://localhost:5000/health
 ```
-
-
-- Unknown routes return a JSON 404 payload with both `method` and `path`.

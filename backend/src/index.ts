@@ -50,7 +50,6 @@ app.get("/health", (_req: Request, res: Response) => {
   res.json({
     status: "ok",
     service: "nexusx-exchange-simulator",
-    environment: config.server.nodeEnv,
     uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
   });

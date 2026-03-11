@@ -85,7 +85,7 @@ export class MatchingEngine {
       const sequence = ++this.sequence;
       const effectiveAt = now + this.sampleLatencyMs();
 
-      this.queue.push({
+      const command: QueuedCommand = {
         id: randomUUID(),
         submittedAt: now,
         effectiveAt,
@@ -93,15 +93,9 @@ export class MatchingEngine {
         type: "place_order",
         payload: request,
         resolve,
-      });
+      };
 
-      this.queue.sort((a, b) => {
-        if (a.effectiveAt === b.effectiveAt) {
-          return a.sequence - b.sequence;
-        }
-        return a.effectiveAt - b.effectiveAt;
-      });
-
+      this.insertQueueCommand(command);
       this.scheduleFlush();
     });
   }
@@ -136,7 +130,6 @@ export class MatchingEngine {
   }
 
   getTrades(symbol: string, limit = 100): Trade[] {
-
     const normalizedSymbol = this.normalizeSymbol(symbol);
     const trades = this.tradesBySymbol.get(normalizedSymbol) ?? [];
     const normalizedLimit = Math.max(1, Math.floor(limit));
@@ -162,26 +155,28 @@ export class MatchingEngine {
       tradesBySymbol,
       timestamp: new Date().toISOString(),
     };
-
-    const trades = this.tradesBySymbol.get(symbol) ?? [];
-    const normalizedLimit = Math.max(1, Math.floor(limit));
-    return trades.slice(-normalizedLimit).map((trade) => structuredClone(trade));
+  }
 
   getAnalytics(symbol: string): SymbolAnalytics {
     const normalizedSymbol = this.normalizeSymbol(symbol);
     const book = this.ensureBook(normalizedSymbol);
     const snapshot = book.snapshot(10);
     const trades = this.tradesBySymbol.get(normalizedSymbol) ?? [];
+
+    let totalTradeQty = 0;
+    let totalTradeNotional = 0;
+    let totalLatency = 0;
+    for (const trade of trades) {
+      totalTradeQty += trade.quantity;
+      totalTradeNotional += trade.quantity * trade.price;
+      totalLatency += trade.latencyMs;
+    }
+
     const totalBidLiquidity = snapshot.bids.reduce((sum, level) => sum + level.quantity, 0);
     const totalAskLiquidity = snapshot.asks.reduce((sum, level) => sum + level.quantity, 0);
-
     const bestBidQty = snapshot.bids[0]?.quantity ?? 0;
     const bestAskQty = snapshot.asks[0]?.quantity ?? 0;
     const denominator = bestBidQty + bestAskQty;
-
-    const totalTradeQty = trades.reduce((sum, trade) => sum + trade.quantity, 0);
-    const totalTradeNotional = trades.reduce((sum, trade) => sum + trade.quantity * trade.price, 0);
-    const totalLatency = trades.reduce((sum, trade) => sum + trade.latencyMs, 0);
 
     return {
       symbol: normalizedSymbol,
@@ -206,8 +201,7 @@ export class MatchingEngine {
       return;
     }
 
-    const next = this.queue[0];
-    const waitMs = Math.max(0, next.effectiveAt - Date.now());
+    const waitMs = Math.max(0, this.queue[0].effectiveAt - Date.now());
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
       this.flushQueue();
@@ -216,17 +210,9 @@ export class MatchingEngine {
 
   private flushQueue(): void {
     const now = Date.now();
-    const readyCommands: QueuedCommand[] = [];
 
-    while (this.queue.length > 0) {
-      const next = this.queue[0];
-      if (next.effectiveAt > now) {
-        break;
-      }
-      readyCommands.push(this.queue.shift() as QueuedCommand);
-    }
-
-    for (const command of readyCommands) {
+    while (this.queue.length > 0 && this.queue[0].effectiveAt <= now) {
+      const command = this.queue.shift() as QueuedCommand;
       const result = this.processPlaceOrder(command.payload, command.submittedAt);
       command.resolve(result);
     }
@@ -239,22 +225,18 @@ export class MatchingEngine {
     submittedAt: number
   ): { accepted: boolean; reason?: string; order?: Order; trades?: Trade[] } {
     const account = this.ensureAccount(request.traderId);
+    const normalizedSymbol = this.normalizeSymbol(request.symbol);
 
     if (request.price <= 0 || request.quantity <= 0) {
       return { accepted: false, reason: "Price and quantity must be positive" };
     }
 
+    const timestamp = new Date().toISOString();
     const order: Order = {
       id: randomUUID(),
       clientOrderId: request.clientOrderId,
       traderId: request.traderId,
-
-      symbol: this.normalizeSymbol(request.symbol),
-
-
-      symbol: this.normalizeSymbol(request.symbol),
-      symbol: request.symbol.toUpperCase(),
-
+      symbol: normalizedSymbol,
       side: request.side,
       type: "limit",
       price: request.price,
@@ -262,13 +244,12 @@ export class MatchingEngine {
       remainingQuantity: request.quantity,
       status: "open",
       timeInForce: request.timeInForce ?? "gtc",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: timestamp,
+      updatedAt: timestamp,
       sequence: ++this.sequence,
     };
 
-    const reserveOk = this.reserveForOrder(account, order);
-    if (!reserveOk) {
+    if (!this.reserveForOrder(account, order)) {
       order.status = "rejected";
       this.orderHistory.set(order.id, structuredClone(order));
       this.emit({
@@ -299,7 +280,6 @@ export class MatchingEngine {
 
       const buyOrder = order.side === "buy" ? order : restingOrder;
       const sellOrder = order.side === "sell" ? order : restingOrder;
-
       this.applyTradeSettlement(buyOrder, sellOrder, tradeQty, tradePrice);
 
       const trade: Trade = {
@@ -318,8 +298,7 @@ export class MatchingEngine {
       trades.push(trade);
 
       if (restingOrder.remainingQuantity === 0) {
-        const restingSide: Side = restingOrder.side;
-        const removed = book.shiftBestOrder(restingSide, restingOrder.price);
+        const removed = book.shiftBestOrder(restingOrder.side, restingOrder.price);
         if (removed) {
           removed.status = "filled";
           this.openOrders.delete(removed.id);
@@ -343,13 +322,14 @@ export class MatchingEngine {
       this.openOrders.set(order.id, order);
     }
 
-    const symbolTrades = this.tradesBySymbol.get(order.symbol) ?? [];
-    symbolTrades.push(...trades);
-    if (symbolTrades.length > this.options.maxTradesPerSymbol) {
-      const excess = symbolTrades.length - this.options.maxTradesPerSymbol;
-      symbolTrades.splice(0, excess);
+    if (trades.length > 0) {
+      const symbolTrades = this.tradesBySymbol.get(order.symbol) ?? [];
+      symbolTrades.push(...trades);
+      if (symbolTrades.length > this.options.maxTradesPerSymbol) {
+        symbolTrades.splice(0, symbolTrades.length - this.options.maxTradesPerSymbol);
+      }
+      this.tradesBySymbol.set(order.symbol, symbolTrades);
     }
-    this.tradesBySymbol.set(order.symbol, symbolTrades);
 
     this.emit({ type: "order_accepted", payload: order, timestamp: new Date().toISOString() });
     for (const trade of trades) {
@@ -424,7 +404,6 @@ export class MatchingEngine {
     account.updatedAt = new Date().toISOString();
   }
 
-
   private normalizeSymbol(symbol: string): string {
     return symbol.trim().toUpperCase();
   }
@@ -458,6 +437,30 @@ export class MatchingEngine {
     };
     this.accounts.set(traderId, created);
     return created;
+  }
+
+  private insertQueueCommand(command: QueuedCommand): void {
+    if (this.queue.length === 0) {
+      this.queue.push(command);
+      return;
+    }
+
+    let left = 0;
+    let right = this.queue.length;
+    while (left < right) {
+      const mid = (left + right) >> 1;
+      const current = this.queue[mid];
+      if (
+        current.effectiveAt < command.effectiveAt ||
+        (current.effectiveAt === command.effectiveAt && current.sequence <= command.sequence)
+      ) {
+        left = mid + 1;
+      } else {
+        right = mid;
+      }
+    }
+
+    this.queue.splice(left, 0, command);
   }
 
   private emit(event: EngineEvent): void {

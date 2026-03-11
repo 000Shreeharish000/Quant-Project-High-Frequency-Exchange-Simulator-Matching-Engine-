@@ -55,9 +55,28 @@ interface EngineStats {
   timestamp: string;
 }
 
+interface DepthPoint {
+  price: number;
+  cumulativeQty: number;
+}
+
+const TIMELINE_WIDTH = 620;
+const TIMELINE_HEIGHT = 180;
+
 const numberOrDash = (value: number | null, digits = 2): string => {
   if (value === null || Number.isNaN(value)) return "—";
   return value.toFixed(digits);
+};
+
+const buildDepthPoints = (levels: OrderBookLevel[]): DepthPoint[] => {
+  let running = 0;
+  return levels.map((level) => {
+    running += level.quantity;
+    return {
+      price: level.price,
+      cumulativeQty: running,
+    };
+  });
 };
 
 const Trade = () => {
@@ -73,6 +92,83 @@ const Trade = () => {
   const [stats, setStats] = useState<EngineStats | null>(null);
 
   const normalizedInput = useMemo(() => symbolInput.trim().toUpperCase() || "BTCUSD", [symbolInput]);
+
+  const maxBookQty = useMemo(() => {
+    const levels = [...(orderBook?.bids ?? []), ...(orderBook?.asks ?? [])];
+    return levels.reduce((max, level) => Math.max(max, level.quantity), 0);
+  }, [orderBook]);
+
+  const tradeChartData = useMemo(() => {
+    const ordered = [...trades].reverse();
+    const maxQty = ordered.reduce((max, t) => Math.max(max, t.quantity), 0);
+    const priceMin = ordered.reduce((min, t) => Math.min(min, t.price), Number.POSITIVE_INFINITY);
+    const priceMax = ordered.reduce((max, t) => Math.max(max, t.price), Number.NEGATIVE_INFINITY);
+
+    return {
+      points: ordered.map((trade, index) => ({
+        ...trade,
+        index,
+        widthPct: maxQty > 0 ? (trade.quantity / maxQty) * 100 : 0,
+      })),
+      priceMin: Number.isFinite(priceMin) ? priceMin : null,
+      priceMax: Number.isFinite(priceMax) ? priceMax : null,
+    };
+  }, [trades]);
+
+  const depthData = useMemo(() => {
+    const bidPoints = buildDepthPoints(orderBook?.bids ?? []);
+    const askPoints = buildDepthPoints(orderBook?.asks ?? []);
+    const maxDepth = Math.max(
+      ...bidPoints.map((p) => p.cumulativeQty),
+      ...askPoints.map((p) => p.cumulativeQty),
+      0
+    );
+    return { bidPoints, askPoints, maxDepth };
+  }, [orderBook]);
+
+  const volumeBySide = useMemo(() => {
+    const buyVolume = trades.filter((t) => t.aggressorSide === "buy").reduce((sum, t) => sum + t.quantity, 0);
+    const sellVolume = trades.filter((t) => t.aggressorSide === "sell").reduce((sum, t) => sum + t.quantity, 0);
+    const total = buyVolume + sellVolume;
+
+    return {
+      buyVolume,
+      sellVolume,
+      buyPct: total > 0 ? (buyVolume / total) * 100 : 0,
+      sellPct: total > 0 ? (sellVolume / total) * 100 : 0,
+    };
+  }, [trades]);
+
+  const imbalancePct = useMemo(() => {
+    const value = analytics?.topOfBookImbalance;
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return 50;
+    }
+    return Math.max(0, Math.min(100, (value + 1) * 50));
+  }, [analytics]);
+
+  const timelineSeries = useMemo(() => {
+    if (tradeChartData.points.length === 0) {
+      return { polyline: "", points: [] as Array<Trade & { x: number; y: number }> };
+    }
+
+    const range =
+      tradeChartData.priceMax !== null && tradeChartData.priceMin !== null
+        ? tradeChartData.priceMax - tradeChartData.priceMin
+        : 0;
+
+    const points = tradeChartData.points.map((point, index) => {
+      const x = tradeChartData.points.length > 1 ? (index / (tradeChartData.points.length - 1)) * TIMELINE_WIDTH : 0;
+      const normalized = range > 0 && tradeChartData.priceMin !== null ? (point.price - tradeChartData.priceMin) / range : 0.5;
+      const y = TIMELINE_HEIGHT - normalized * TIMELINE_HEIGHT;
+      return { ...point, x, y };
+    });
+
+    return {
+      polyline: points.map((p) => `${p.x},${p.y}`).join(" "),
+      points,
+    };
+  }, [tradeChartData]);
 
   const fetchMarketData = useCallback(async (targetSymbol: string) => {
     const requestId = ++lastRequestId.current;
@@ -131,7 +227,7 @@ const Trade = () => {
   return (
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 border bg-card p-6 shadow-sm md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-card-foreground">Trading Dashboard</h1>
             <p className="text-sm text-muted-foreground">Live market overview for the matching engine simulator.</p>
@@ -147,18 +243,18 @@ const Trade = () => {
                 }
               }}
               placeholder="Symbol (e.g. BTCUSD)"
-              className="h-10 rounded-md border bg-background px-3 text-sm"
+              className="h-10 border bg-background px-3 text-sm"
             />
             <button
               onClick={applySymbol}
-              className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+              className="h-10 bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
               Apply Symbol
             </button>
             <button
               onClick={() => fetchMarketData(activeSymbol)}
               disabled={loading}
-              className="h-10 rounded-md border px-4 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-10 border px-4 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Refreshing..." : "Refresh"}
             </button>
@@ -168,49 +264,49 @@ const Trade = () => {
           </div>
         </div>
 
-        {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+        {error && <div className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Mid Price</p>
-            <p className="text-xl font-semibold">{numberOrDash(analytics?.midPrice ?? null)}</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Spread</p>
-            <p className="text-xl font-semibold">{numberOrDash(analytics?.spread ?? null)}</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Last Trade</p>
-            <p className="text-xl font-semibold">{numberOrDash(analytics?.lastTradePrice ?? null)}</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Engine Queue</p>
-            <p className="text-xl font-semibold">{stats?.queueDepth ?? 0}</p>
-          </div>
+          <Metric title="Mid Price" value={numberOrDash(analytics?.midPrice ?? null)} />
+          <Metric title="Spread" value={numberOrDash(analytics?.spread ?? null)} />
+          <Metric title="Last Trade" value={numberOrDash(analytics?.lastTradePrice ?? null)} />
+          <Metric title="Engine Queue" value={`${stats?.queueDepth ?? 0}`} />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-lg border bg-card p-4 lg:col-span-2">
+          <div className="border bg-card p-4 lg:col-span-2">
             <h2 className="mb-3 font-semibold">Order Book ({activeSymbol})</h2>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="mb-2 font-medium text-emerald-600">Bids</p>
+                <p className="mb-2 font-medium text-emerald-400">Bids</p>
                 <div className="space-y-1">
                   {(orderBook?.bids ?? []).map((level) => (
-                    <div key={`bid-${level.price}`} className="flex justify-between rounded bg-emerald-500/5 px-2 py-1">
-                      <span>{level.price.toFixed(2)}</span>
-                      <span>{level.quantity.toFixed(4)}</span>
+                    <div key={`bid-${level.price}`} className="relative overflow-hidden border px-2 py-1">
+                      <div
+                        className="absolute inset-y-0 left-0 bg-emerald-500/20"
+                        style={{ width: `${maxBookQty > 0 ? (level.quantity / maxBookQty) * 100 : 0}%` }}
+                      />
+                      <div className="relative z-10 flex justify-between">
+                        <span>{level.price.toFixed(2)}</span>
+                        <span>{level.quantity.toFixed(4)}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <p className="mb-2 font-medium text-rose-600">Asks</p>
+                <p className="mb-2 font-medium text-rose-400">Asks</p>
                 <div className="space-y-1">
                   {(orderBook?.asks ?? []).map((level) => (
-                    <div key={`ask-${level.price}`} className="flex justify-between rounded bg-rose-500/5 px-2 py-1">
-                      <span>{level.price.toFixed(2)}</span>
-                      <span>{level.quantity.toFixed(4)}</span>
+                    <div key={`ask-${level.price}`} className="relative overflow-hidden border px-2 py-1">
+                      <div
+                        className="absolute inset-y-0 right-0 bg-rose-500/20"
+                        style={{ width: `${maxBookQty > 0 ? (level.quantity / maxBookQty) * 100 : 0}%` }}
+                      />
+                      <div className="relative z-10 flex justify-between">
+                        <span>{level.price.toFixed(2)}</span>
+                        <span>{level.quantity.toFixed(4)}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -218,14 +314,14 @@ const Trade = () => {
             </div>
           </div>
 
-          <div className="rounded-lg border bg-card p-4">
+          <div className="border bg-card p-4">
             <h2 className="mb-3 font-semibold">Recent Trades</h2>
             <div className="space-y-2 text-sm">
               {trades.length === 0 && <p className="text-muted-foreground">No recent trades.</p>}
               {trades.map((trade) => (
-                <div key={trade.id} className="rounded border px-2 py-1">
+                <div key={trade.id} className="border px-2 py-1">
                   <div className="flex items-center justify-between">
-                    <span className={trade.aggressorSide === "buy" ? "text-emerald-600" : "text-rose-600"}>
+                    <span className={trade.aggressorSide === "buy" ? "text-emerald-400" : "text-rose-400"}>
                       {trade.aggressorSide.toUpperCase()}
                     </span>
                     <span>{trade.price.toFixed(2)}</span>
@@ -238,13 +334,208 @@ const Trade = () => {
             </div>
           </div>
         </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="border bg-card p-4">
+            <h2 className="mb-4 font-semibold">Trade Size Visualization</h2>
+            <div className="space-y-2">
+              {tradeChartData.points.length === 0 && <p className="text-sm text-muted-foreground">No trade data yet.</p>}
+              {tradeChartData.points.map((trade) => (
+                <div key={`chart-${trade.id}`} className="grid grid-cols-[84px_1fr_84px] items-center gap-2 text-xs">
+                  <span className={trade.aggressorSide === "buy" ? "text-emerald-400" : "text-rose-400"}>
+                    {new Date(trade.executedAt).toLocaleTimeString()}
+                  </span>
+                  <div className="h-4 border bg-muted">
+                    <div
+                      className={trade.aggressorSide === "buy" ? "h-full bg-emerald-500" : "h-full bg-rose-500"}
+                      style={{ width: `${trade.widthPct}%` }}
+                    />
+                  </div>
+                  <span className="text-right text-muted-foreground">{trade.quantity.toFixed(4)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border bg-card p-4">
+            <h2 className="mb-4 font-semibold">Liquidity Balance</h2>
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                  <span>Bid Liquidity</span>
+                  <span>{numberOrDash(analytics?.totalBidLiquidity ?? null, 4)}</span>
+                </div>
+                <div className="h-5 border bg-muted">
+                  <div
+                    className="h-full bg-cyan-500"
+                    style={{
+                      width: `${
+                        (analytics?.totalBidLiquidity ?? 0) + (analytics?.totalAskLiquidity ?? 0) > 0
+                          ? ((analytics?.totalBidLiquidity ?? 0) /
+                              ((analytics?.totalBidLiquidity ?? 0) + (analytics?.totalAskLiquidity ?? 0))) *
+                            100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                  <span>Ask Liquidity</span>
+                  <span>{numberOrDash(analytics?.totalAskLiquidity ?? null, 4)}</span>
+                </div>
+                <div className="h-5 border bg-muted">
+                  <div
+                    className="h-full bg-orange-500"
+                    style={{
+                      width: `${
+                        (analytics?.totalBidLiquidity ?? 0) + (analytics?.totalAskLiquidity ?? 0) > 0
+                          ? ((analytics?.totalAskLiquidity ?? 0) /
+                              ((analytics?.totalBidLiquidity ?? 0) + (analytics?.totalAskLiquidity ?? 0))) *
+                            100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="border p-2">
+                  <p className="text-xs text-muted-foreground">VWAP</p>
+                  <p className="font-semibold">{numberOrDash(analytics?.vwap ?? null)}</p>
+                </div>
+                <div className="border p-2">
+                  <p className="text-xs text-muted-foreground">Avg Latency</p>
+                  <p className="font-semibold">{numberOrDash(analytics?.averageExecutionLatencyMs ?? null, 3)} ms</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border bg-card p-4">
+            <h2 className="mb-2 font-semibold">Market Pressure</h2>
+            <p className="mb-3 text-xs text-muted-foreground">Top-of-book imbalance and aggressor side distribution.</p>
+
+            <div className="mb-4">
+              <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                <span>Top-of-book Imbalance</span>
+                <span>{numberOrDash(analytics?.topOfBookImbalance ?? null, 3)}</span>
+              </div>
+              <div className="relative h-5 border bg-muted">
+                <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
+                <div className="absolute inset-y-0 left-0 bg-emerald-500/40" style={{ width: `${imbalancePct}%` }} />
+                <div className="absolute inset-y-0 right-0 bg-rose-500/35" style={{ width: `${100 - imbalancePct}%` }} />
+              </div>
+              <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+                <span>Sell Pressure</span>
+                <span>Buy Pressure</span>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                <span>Recent Aggressor Mix</span>
+                <span>{numberOrDash(volumeBySide.buyVolume + volumeBySide.sellVolume, 4)}</span>
+              </div>
+              <div className="flex h-5 border bg-muted">
+                <div className="bg-emerald-500" style={{ width: `${volumeBySide.buyPct}%` }} />
+                <div className="bg-rose-500" style={{ width: `${volumeBySide.sellPct}%` }} />
+              </div>
+              <div className="mt-1 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                <span className="text-emerald-400">Buy {numberOrDash(volumeBySide.buyVolume, 4)}</span>
+                <span className="text-right text-rose-400">Sell {numberOrDash(volumeBySide.sellVolume, 4)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="border bg-card p-4">
+            <h2 className="mb-2 font-semibold">Cumulative Depth Profile</h2>
+            <p className="mb-3 text-xs text-muted-foreground">Cumulative quantity by price level for bid/ask sides.</p>
+            <div className="space-y-2">
+              {depthData.bidPoints.map((point) => (
+                <div key={`depth-buy-${point.price}`} className="grid grid-cols-[80px_1fr_72px] items-center gap-2 text-xs">
+                  <span className="text-emerald-400">{point.price.toFixed(2)}</span>
+                  <div className="h-3 border bg-muted">
+                    <div
+                      className="h-full bg-emerald-500"
+                      style={{ width: `${depthData.maxDepth > 0 ? (point.cumulativeQty / depthData.maxDepth) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <span className="text-right text-muted-foreground">{point.cumulativeQty.toFixed(3)}</span>
+                </div>
+              ))}
+              {depthData.askPoints.map((point) => (
+                <div key={`depth-sell-${point.price}`} className="grid grid-cols-[80px_1fr_72px] items-center gap-2 text-xs">
+                  <span className="text-rose-400">{point.price.toFixed(2)}</span>
+                  <div className="h-3 border bg-muted">
+                    <div
+                      className="h-full bg-rose-500"
+                      style={{ width: `${depthData.maxDepth > 0 ? (point.cumulativeQty / depthData.maxDepth) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <span className="text-right text-muted-foreground">{point.cumulativeQty.toFixed(3)}</span>
+                </div>
+              ))}
+              {depthData.bidPoints.length === 0 && depthData.askPoints.length === 0 && (
+                <p className="text-xs text-muted-foreground">No depth data yet.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="border bg-card p-4">
+            <h2 className="mb-2 font-semibold">Trade Price Timeline</h2>
+            <p className="mb-3 text-xs text-muted-foreground">Connected price path with side-colored points and chart grid.</p>
+            <div className="border bg-muted/20 p-2">
+              {timelineSeries.points.length === 0 ? (
+                <div className="flex h-[180px] items-center justify-center text-xs text-muted-foreground">No timeline data yet.</div>
+              ) : (
+                <svg viewBox={`0 0 ${TIMELINE_WIDTH} ${TIMELINE_HEIGHT}`} className="h-[180px] w-full">
+                  <line x1="0" y1="45" x2={TIMELINE_WIDTH} y2="45" stroke="hsl(var(--border))" strokeDasharray="4 4" />
+                  <line x1="0" y1="90" x2={TIMELINE_WIDTH} y2="90" stroke="hsl(var(--border))" strokeDasharray="4 4" />
+                  <line x1="0" y1="135" x2={TIMELINE_WIDTH} y2="135" stroke="hsl(var(--border))" strokeDasharray="4 4" />
+
+                  <polyline
+                    fill="none"
+                    stroke="hsl(var(--foreground))"
+                    strokeWidth="2"
+                    points={timelineSeries.polyline}
+                    opacity="0.85"
+                  />
+
+                  {timelineSeries.points.map((point) => (
+                    <circle
+                      key={`timeline-point-${point.id}`}
+                      cx={point.x}
+                      cy={point.y}
+                      r="4"
+                      fill={point.aggressorSide === "buy" ? "#10b981" : "#f43f5e"}
+                      stroke="hsl(var(--background))"
+                      strokeWidth="1"
+                    />
+                  ))}
+                </svg>
+              )}
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{tradeChartData.priceMax !== null ? `High ${tradeChartData.priceMax.toFixed(2)}` : "High —"}</span>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-2 border bg-emerald-500" />Buy</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-2 border bg-rose-500" />Sell</span>
+              </div>
+              <span>{tradeChartData.priceMin !== null ? `Low ${tradeChartData.priceMin.toFixed(2)}` : "Low —"}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 const Metric = ({ title, value }: { title: string; value: string }) => (
-  <div className="rounded-lg border bg-card p-4">
+  <div className="border bg-card p-4">
     <p className="text-xs text-muted-foreground">{title}</p>
     <p className="text-xl font-semibold text-card-foreground">{value}</p>
   </div>

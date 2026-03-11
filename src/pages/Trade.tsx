@@ -55,9 +55,25 @@ interface EngineStats {
   timestamp: string;
 }
 
+interface DepthPoint {
+  price: number;
+  cumulativeQty: number;
+}
+
 const numberOrDash = (value: number | null, digits = 2): string => {
   if (value === null || Number.isNaN(value)) return "—";
   return value.toFixed(digits);
+};
+
+const buildDepthPoints = (levels: OrderBookLevel[]): DepthPoint[] => {
+  let running = 0;
+  return levels.map((level) => {
+    running += level.quantity;
+    return {
+      price: level.price,
+      cumulativeQty: running,
+    };
+  });
 };
 
 const Trade = () => {

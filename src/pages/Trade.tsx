@@ -98,30 +98,11 @@ const Trade = () => {
   const tradeChartData = useMemo(() => {
     const ordered = [...trades].reverse();
     const maxQty = ordered.reduce((max, t) => Math.max(max, t.quantity), 0);
-    const priceMin = ordered.reduce((min, t) => Math.min(min, t.price), Number.POSITIVE_INFINITY);
-    const priceMax = ordered.reduce((max, t) => Math.max(max, t.price), Number.NEGATIVE_INFINITY);
-
-    return {
-      points: ordered.map((trade, index) => ({
-        ...trade,
-        index,
-        widthPct: maxQty > 0 ? (trade.quantity / maxQty) * 100 : 0,
-      })),
-      priceMin: Number.isFinite(priceMin) ? priceMin : null,
-      priceMax: Number.isFinite(priceMax) ? priceMax : null,
-    };
+    return ordered.map((trade) => ({
+      ...trade,
+      widthPct: maxQty > 0 ? (trade.quantity / maxQty) * 100 : 0,
+    }));
   }, [trades]);
-
-  const depthData = useMemo(() => {
-    const bidPoints = buildDepthPoints(orderBook?.bids ?? []);
-    const askPoints = buildDepthPoints(orderBook?.asks ?? []);
-    const maxDepth = Math.max(
-      ...bidPoints.map((p) => p.cumulativeQty),
-      ...askPoints.map((p) => p.cumulativeQty),
-      0
-    );
-    return { bidPoints, askPoints, maxDepth };
-  }, [orderBook]);
 
   const fetchMarketData = useCallback(async (targetSymbol: string) => {
     const requestId = ++lastRequestId.current;
@@ -292,9 +273,9 @@ const Trade = () => {
           <div className="border bg-card p-4">
             <h2 className="mb-4 font-semibold">Trade Size Visualization</h2>
             <div className="space-y-2">
-              {tradeChartData.points.length === 0 && <p className="text-sm text-muted-foreground">No trade data yet.</p>}
-              {tradeChartData.points.map((trade) => (
-                <div key={`chart-${trade.id}`} className="grid grid-cols-[84px_1fr_84px] items-center gap-2 text-xs">
+              {tradeChartData.length === 0 && <p className="text-sm text-muted-foreground">No trade data yet.</p>}
+              {tradeChartData.map((trade) => (
+                <div key={`chart-${trade.id}`} className="grid grid-cols-[92px_1fr_72px] items-center gap-2 text-xs">
                   <span className={trade.aggressorSide === "buy" ? "text-emerald-400" : "text-rose-400"}>
                     {new Date(trade.executedAt).toLocaleTimeString()}
                   </span>
@@ -363,79 +344,6 @@ const Trade = () => {
                   <p className="font-semibold">{numberOrDash(analytics?.averageExecutionLatencyMs ?? null, 3)} ms</p>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="border bg-card p-4">
-            <h2 className="mb-2 font-semibold">Cumulative Depth Profile</h2>
-            <p className="mb-3 text-xs text-muted-foreground">Cumulative quantity by price level for bid/ask sides.</p>
-            <div className="space-y-2">
-              {depthData.bidPoints.map((point) => (
-                <div key={`depth-buy-${point.price}`} className="grid grid-cols-[80px_1fr_72px] items-center gap-2 text-xs">
-                  <span className="text-emerald-400">{point.price.toFixed(2)}</span>
-                  <div className="h-3 border bg-muted">
-                    <div
-                      className="h-full bg-emerald-500"
-                      style={{ width: `${depthData.maxDepth > 0 ? (point.cumulativeQty / depthData.maxDepth) * 100 : 0}%` }}
-                    />
-                  </div>
-                  <span className="text-right text-muted-foreground">{point.cumulativeQty.toFixed(3)}</span>
-                </div>
-              ))}
-              {depthData.askPoints.map((point) => (
-                <div key={`depth-sell-${point.price}`} className="grid grid-cols-[80px_1fr_72px] items-center gap-2 text-xs">
-                  <span className="text-rose-400">{point.price.toFixed(2)}</span>
-                  <div className="h-3 border bg-muted">
-                    <div
-                      className="h-full bg-rose-500"
-                      style={{ width: `${depthData.maxDepth > 0 ? (point.cumulativeQty / depthData.maxDepth) * 100 : 0}%` }}
-                    />
-                  </div>
-                  <span className="text-right text-muted-foreground">{point.cumulativeQty.toFixed(3)}</span>
-                </div>
-              ))}
-              {depthData.bidPoints.length === 0 && depthData.askPoints.length === 0 && (
-                <p className="text-xs text-muted-foreground">No depth data yet.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="border bg-card p-4">
-            <h2 className="mb-2 font-semibold">Trade Price Timeline</h2>
-            <p className="mb-3 text-xs text-muted-foreground">Recent trade prices with side-colored markers.</p>
-            <div className="relative h-40 border bg-muted/30">
-              {tradeChartData.points.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                  No timeline data yet.
-                </div>
-              )}
-              {tradeChartData.points.map((point, index) => {
-                const xPct = tradeChartData.points.length > 1 ? (index / (tradeChartData.points.length - 1)) * 100 : 0;
-                const range =
-                  tradeChartData.priceMax !== null && tradeChartData.priceMin !== null
-                    ? tradeChartData.priceMax - tradeChartData.priceMin
-                    : 0;
-                const normalized =
-                  range > 0 && tradeChartData.priceMin !== null ? (point.price - tradeChartData.priceMin) / range : 0.5;
-                const yPct = 100 - normalized * 100;
-
-                return (
-                  <div
-                    key={`timeline-point-${point.id}`}
-                    className={`absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 border ${
-                      point.aggressorSide === "buy" ? "bg-emerald-500" : "bg-rose-500"
-                    }`}
-                    style={{ left: `${xPct}%`, top: `${yPct}%` }}
-                    title={`${point.price.toFixed(2)} @ ${new Date(point.executedAt).toLocaleTimeString()}`}
-                  />
-                );
-              })}
-            </div>
-            <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
-              <span>{tradeChartData.priceMax !== null ? `High ${tradeChartData.priceMax.toFixed(2)}` : "High —"}</span>
-              <span>{tradeChartData.priceMin !== null ? `Low ${tradeChartData.priceMin.toFixed(2)}` : "Low —"}</span>
             </div>
           </div>
         </div>

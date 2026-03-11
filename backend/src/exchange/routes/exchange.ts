@@ -35,12 +35,6 @@ const tradesQuerySchema = z.object({
 const symbolParamSchema = z.object({
   symbol: z.string().trim().min(2).max(15),
 });
-  limit: z.coerce.number().int().min(1).max(500).default(100)
-  
-  
-const symbolParamSchema = z.object({
-  symbol: z.string().trim().min(2).max(15),
-});
 
 router.post("/accounts/fund", (req, res) => {
   const parsed = accountSchema.safeParse(req.body);
@@ -115,7 +109,6 @@ router.delete("/orders/:orderId", (req, res) => {
 });
 
 router.get("/orderbook/:symbol", (req, res) => {
-
   const parsedParams = symbolParamSchema.safeParse(req.params);
   if (!parsedParams.success) {
     return res.status(400).json({
@@ -135,14 +128,10 @@ router.get("/orderbook/:symbol", (req, res) => {
   }
 
   const snapshot = matchingEngine.getOrderBook(parsedParams.data.symbol, parsedQuery.data.depth);
-
-  const snapshot = matchingEngine.getOrderBook(req.params.symbol, parsedQuery.data.depth);
-
   return res.status(200).json({ success: true, data: snapshot });
 });
 
 router.get("/trades/:symbol", (req, res) => {
-
   const parsedParams = symbolParamSchema.safeParse(req.params);
   if (!parsedParams.success) {
     return res.status(400).json({
@@ -162,8 +151,6 @@ router.get("/trades/:symbol", (req, res) => {
   }
 
   const trades = matchingEngine.getTrades(parsedParams.data.symbol, parsedQuery.data.limit);
-
-  const trades = matchingEngine.getTrades(req.params.symbol, parsedQuery.data.limit);
   return res.status(200).json({ success: true, data: trades });
 });
 

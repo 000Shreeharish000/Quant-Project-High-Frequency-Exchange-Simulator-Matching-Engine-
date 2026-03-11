@@ -74,6 +74,20 @@ const Trade = () => {
 
   const normalizedInput = useMemo(() => symbolInput.trim().toUpperCase() || "BTCUSD", [symbolInput]);
 
+  const maxBookQty = useMemo(() => {
+    const levels = [...(orderBook?.bids ?? []), ...(orderBook?.asks ?? [])];
+    return levels.reduce((max, level) => Math.max(max, level.quantity), 0);
+  }, [orderBook]);
+
+  const tradeChartData = useMemo(() => {
+    const ordered = [...trades].reverse();
+    const maxQty = ordered.reduce((max, t) => Math.max(max, t.quantity), 0);
+    return ordered.map((trade) => ({
+      ...trade,
+      widthPct: maxQty > 0 ? (trade.quantity / maxQty) * 100 : 0,
+    }));
+  }, [trades]);
+
   const fetchMarketData = useCallback(async (targetSymbol: string) => {
     const requestId = ++lastRequestId.current;
     setLoading(true);
@@ -131,7 +145,7 @@ const Trade = () => {
   return (
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 border bg-card p-6 shadow-sm md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-card-foreground">Trading Dashboard</h1>
             <p className="text-sm text-muted-foreground">Live market overview for the matching engine simulator.</p>
@@ -147,18 +161,18 @@ const Trade = () => {
                 }
               }}
               placeholder="Symbol (e.g. BTCUSD)"
-              className="h-10 rounded-md border bg-background px-3 text-sm"
+              className="h-10 border bg-background px-3 text-sm"
             />
             <button
               onClick={applySymbol}
-              className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+              className="h-10 bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
               Apply Symbol
             </button>
             <button
               onClick={() => fetchMarketData(activeSymbol)}
               disabled={loading}
-              className="h-10 rounded-md border px-4 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-10 border px-4 text-sm font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Refreshing..." : "Refresh"}
             </button>
@@ -168,49 +182,49 @@ const Trade = () => {
           </div>
         </div>
 
-        {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+        {error && <div className="border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Mid Price</p>
-            <p className="text-xl font-semibold">{numberOrDash(analytics?.midPrice ?? null)}</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Spread</p>
-            <p className="text-xl font-semibold">{numberOrDash(analytics?.spread ?? null)}</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Last Trade</p>
-            <p className="text-xl font-semibold">{numberOrDash(analytics?.lastTradePrice ?? null)}</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Engine Queue</p>
-            <p className="text-xl font-semibold">{stats?.queueDepth ?? 0}</p>
-          </div>
+          <Metric title="Mid Price" value={numberOrDash(analytics?.midPrice ?? null)} />
+          <Metric title="Spread" value={numberOrDash(analytics?.spread ?? null)} />
+          <Metric title="Last Trade" value={numberOrDash(analytics?.lastTradePrice ?? null)} />
+          <Metric title="Engine Queue" value={`${stats?.queueDepth ?? 0}`} />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-lg border bg-card p-4 lg:col-span-2">
+          <div className="border bg-card p-4 lg:col-span-2">
             <h2 className="mb-3 font-semibold">Order Book ({activeSymbol})</h2>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="mb-2 font-medium text-emerald-600">Bids</p>
+                <p className="mb-2 font-medium text-emerald-400">Bids</p>
                 <div className="space-y-1">
                   {(orderBook?.bids ?? []).map((level) => (
-                    <div key={`bid-${level.price}`} className="flex justify-between rounded bg-emerald-500/5 px-2 py-1">
-                      <span>{level.price.toFixed(2)}</span>
-                      <span>{level.quantity.toFixed(4)}</span>
+                    <div key={`bid-${level.price}`} className="relative overflow-hidden border px-2 py-1">
+                      <div
+                        className="absolute inset-y-0 left-0 bg-emerald-500/20"
+                        style={{ width: `${maxBookQty > 0 ? (level.quantity / maxBookQty) * 100 : 0}%` }}
+                      />
+                      <div className="relative z-10 flex justify-between">
+                        <span>{level.price.toFixed(2)}</span>
+                        <span>{level.quantity.toFixed(4)}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <p className="mb-2 font-medium text-rose-600">Asks</p>
+                <p className="mb-2 font-medium text-rose-400">Asks</p>
                 <div className="space-y-1">
                   {(orderBook?.asks ?? []).map((level) => (
-                    <div key={`ask-${level.price}`} className="flex justify-between rounded bg-rose-500/5 px-2 py-1">
-                      <span>{level.price.toFixed(2)}</span>
-                      <span>{level.quantity.toFixed(4)}</span>
+                    <div key={`ask-${level.price}`} className="relative overflow-hidden border px-2 py-1">
+                      <div
+                        className="absolute inset-y-0 right-0 bg-rose-500/20"
+                        style={{ width: `${maxBookQty > 0 ? (level.quantity / maxBookQty) * 100 : 0}%` }}
+                      />
+                      <div className="relative z-10 flex justify-between">
+                        <span>{level.price.toFixed(2)}</span>
+                        <span>{level.quantity.toFixed(4)}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -218,14 +232,14 @@ const Trade = () => {
             </div>
           </div>
 
-          <div className="rounded-lg border bg-card p-4">
+          <div className="border bg-card p-4">
             <h2 className="mb-3 font-semibold">Recent Trades</h2>
             <div className="space-y-2 text-sm">
               {trades.length === 0 && <p className="text-muted-foreground">No recent trades.</p>}
               {trades.map((trade) => (
-                <div key={trade.id} className="rounded border px-2 py-1">
+                <div key={trade.id} className="border px-2 py-1">
                   <div className="flex items-center justify-between">
-                    <span className={trade.aggressorSide === "buy" ? "text-emerald-600" : "text-rose-600"}>
+                    <span className={trade.aggressorSide === "buy" ? "text-emerald-400" : "text-rose-400"}>
                       {trade.aggressorSide.toUpperCase()}
                     </span>
                     <span>{trade.price.toFixed(2)}</span>
@@ -238,13 +252,92 @@ const Trade = () => {
             </div>
           </div>
         </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="border bg-card p-4">
+            <h2 className="mb-4 font-semibold">Trade Size Visualization</h2>
+            <div className="space-y-2">
+              {tradeChartData.length === 0 && <p className="text-sm text-muted-foreground">No trade data yet.</p>}
+              {tradeChartData.map((trade) => (
+                <div key={`chart-${trade.id}`} className="grid grid-cols-[92px_1fr_72px] items-center gap-2 text-xs">
+                  <span className={trade.aggressorSide === "buy" ? "text-emerald-400" : "text-rose-400"}>
+                    {new Date(trade.executedAt).toLocaleTimeString()}
+                  </span>
+                  <div className="h-4 border bg-muted">
+                    <div
+                      className={trade.aggressorSide === "buy" ? "h-full bg-emerald-500" : "h-full bg-rose-500"}
+                      style={{ width: `${trade.widthPct}%` }}
+                    />
+                  </div>
+                  <span className="text-right text-muted-foreground">{trade.quantity.toFixed(4)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border bg-card p-4">
+            <h2 className="mb-4 font-semibold">Liquidity Balance</h2>
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                  <span>Bid Liquidity</span>
+                  <span>{numberOrDash(analytics?.totalBidLiquidity ?? null, 4)}</span>
+                </div>
+                <div className="h-5 border bg-muted">
+                  <div
+                    className="h-full bg-cyan-500"
+                    style={{
+                      width: `${
+                        (analytics?.totalBidLiquidity ?? 0) + (analytics?.totalAskLiquidity ?? 0) > 0
+                          ? ((analytics?.totalBidLiquidity ?? 0) /
+                              ((analytics?.totalBidLiquidity ?? 0) + (analytics?.totalAskLiquidity ?? 0))) *
+                            100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                  <span>Ask Liquidity</span>
+                  <span>{numberOrDash(analytics?.totalAskLiquidity ?? null, 4)}</span>
+                </div>
+                <div className="h-5 border bg-muted">
+                  <div
+                    className="h-full bg-orange-500"
+                    style={{
+                      width: `${
+                        (analytics?.totalBidLiquidity ?? 0) + (analytics?.totalAskLiquidity ?? 0) > 0
+                          ? ((analytics?.totalAskLiquidity ?? 0) /
+                              ((analytics?.totalBidLiquidity ?? 0) + (analytics?.totalAskLiquidity ?? 0))) *
+                            100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="border p-2">
+                  <p className="text-xs text-muted-foreground">VWAP</p>
+                  <p className="font-semibold">{numberOrDash(analytics?.vwap ?? null)}</p>
+                </div>
+                <div className="border p-2">
+                  <p className="text-xs text-muted-foreground">Avg Latency</p>
+                  <p className="font-semibold">{numberOrDash(analytics?.averageExecutionLatencyMs ?? null, 3)} ms</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
 const Metric = ({ title, value }: { title: string; value: string }) => (
-  <div className="rounded-lg border bg-card p-4">
+  <div className="border bg-card p-4">
     <p className="text-xs text-muted-foreground">{title}</p>
     <p className="text-xl font-semibold text-card-foreground">{value}</p>
   </div>

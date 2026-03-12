@@ -144,6 +144,4 @@ Base route: `/exchange`
 
 ## 9) Next Improvements
 
-- Persistent order/trade storage for replay and analytics windows.
-- WebSocket transport for richer real-time subscriptions.
 

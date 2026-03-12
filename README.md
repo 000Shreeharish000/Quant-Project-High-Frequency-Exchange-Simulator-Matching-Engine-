@@ -146,5 +146,4 @@ Base route: `/exchange`
 
 - Persistent order/trade storage for replay and analytics windows.
 - WebSocket transport for richer real-time subscriptions.
-- Benchmarks for throughput/latency under synthetic order bursts.
-- Risk checks (max order size, symbol limits, position caps).
+

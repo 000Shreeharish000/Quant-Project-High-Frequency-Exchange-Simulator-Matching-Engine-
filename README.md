@@ -142,6 +142,3 @@ Base route: `/exchange`
 
 ---
 
-## 9) Next Improvements
-
-

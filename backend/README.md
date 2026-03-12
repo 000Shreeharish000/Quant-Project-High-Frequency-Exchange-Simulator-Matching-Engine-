@@ -46,5 +46,3 @@ npm install
 npm run build
 npm run dev
 ```
-
-> If PostgreSQL/Redis are unavailable, the exchange simulator still starts in-memory and logs warnings.

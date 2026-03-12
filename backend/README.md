@@ -1,8 +1,8 @@
-# NEXUSX Exchange Backend
-
+# NEXUSX Exchange Backend : 
+ 
 High-performance exchange simulator backend with deterministic matching, account state tracking, and real-time market streams.
 
-## Core capabilities
+## Core capabilities : 
 
 - Price-time-priority matching engine (`limit` orders, `gtc` + `ioc`).
 - Deterministic fairness queue with simulated exchange ingress latency.
@@ -12,9 +12,9 @@ High-performance exchange simulator backend with deterministic matching, account
 - Real-time market event stream via Server-Sent Events (`/exchange/events`).
 - Authentication module (email/password + Google OAuth + JWT) retained.
 
-## API overview
+## API overview : 
 
-### Exchange endpoints
+### Exchange endpoints : 
 
 - `POST /exchange/accounts/fund` – create/fund account.
 - `GET /exchange/accounts/:traderId` – retrieve account snapshot.

@@ -25,7 +25,7 @@ High-performance exchange simulator backend with deterministic matching, account
 - `GET /exchange/analytics/:symbol` – market analytics.
 - `GET /exchange/events` – SSE feed (`trade_executed`, `book_updated`, etc.).
 
-### Auth endpoints
+### Auth endpoints : 
 
 - `POST /auth/register`
 - `POST /auth/login`
@@ -34,7 +34,7 @@ High-performance exchange simulator backend with deterministic matching, account
 - `GET /auth/google`
 - `GET /auth/google/callback`
 
-## Quick start
+## Quick start : 
 
 ```bash
 # Infrastructure (optional but recommended for auth module)
